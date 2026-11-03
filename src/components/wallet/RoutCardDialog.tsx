@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { downloadVCard } from "@/lib/vcard";
-import { getCardLiveness, getWalletCard, getWalletStatus, verifyCardLiveCode } from "@/lib/wallet/wallet.functions";
+import { getCardLiveness, getWalletCard, getWalletStatus, setMyCardFrozen, verifyCardLiveCode } from "@/lib/wallet/wallet.functions";
 import { pickCardView } from "@/lib/wallet/card-liveness";
 import { MIN_TEXT_CONTRAST, validateCardStyle } from "@/lib/wallet/card-style";
 import type { WalletStatus } from "@/lib/wallet/wallet-pass";
@@ -75,6 +75,9 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
   const [zoomed, setZoomed] = useState(false);
   const [code, setCode] = useState<string | null>(null);
   const [secureUrl, setSecureUrl] = useState<string | null>(null);
+  const [ownerState, setOwnerState] = useState<{ owner: boolean; frozen: boolean; available: boolean }>({ owner: false, frozen: false, available: false });
+  const [liveNonce, setLiveNonce] = useState(0);
+  const freezeCard = useServerFn(setMyCardFrozen);
   const [accent, setAccent] = useState<string | null>(null);
   const accentCheck = card && accent ? validateCardStyle(accent, card.hexBackgroundColor) : null;
   const styledCard = card && accent && accentCheck?.ok ? { ...card, hexForegroundColor: accent } : card;
@@ -125,6 +128,7 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
         live.current = { seed: r.seed, expiresAt: r.expiresAt + skew, windowMs: 30_000 };
         setCode(r.code);
         setSecureUrl(r.secureUrl ?? null);
+        setOwnerState({ owner: r.owner, frozen: r.frozen, available: r.freezeAvailable });
         timer = setTimeout(() => void tick(), Math.max(1000, r.expiresAt + skew - Date.now() + 250));
       } catch {
         if (alive) timer = setTimeout(() => void tick(), 10_000);
@@ -135,7 +139,22 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
       alive = false;
       clearTimeout(timer);
     };
-  }, [open, card, handle, space, loadLive]);
+  }, [open, card, handle, space, loadLive, liveNonce]);
+
+  const toggleFreeze = async () => {
+    const next = !ownerState.frozen;
+    if (next && !window.confirm(t("card.freezeConfirm", { defaultValue: "Kaart bevriezen? Alle QR- en live-codes worden meteen ongeldig tot je weer ontdooit." }))) return;
+    setBusy("freeze");
+    try {
+      await freezeCard({ data: { frozen: next, space } });
+      toast.success(next ? t("card.frozen", { defaultValue: "Kaart bevroren." }) : t("card.unfrozen", { defaultValue: "Kaart weer actief." }));
+      setLiveNonce((n) => n + 1);
+    } catch {
+      toast.error(t("card.freezeFailed", { defaultValue: "Bevriezen lukt nu niet." }));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   // Gyroscope tilt (after the visitor allowed motion access on iOS).
   useEffect(() => {
@@ -308,6 +327,21 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
           )}
           {!gyro && <Button type="button" size="sm" variant="ghost" className="gap-1.5" onClick={() => void enableGyro()}><Smartphone className="h-3.5 w-3.5" aria-hidden /> {t("card.gyro")}</Button>}
         </div>
+
+        {card && ownerState.owner && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border p-3">
+            <p className="text-xs text-muted-foreground">
+              {!ownerState.available
+                ? t("card.freezeUnavailable", { defaultValue: "Bevriezen is nog niet ingesteld in de database." })
+                : ownerState.frozen
+                  ? t("card.frozenNote", { defaultValue: "Je kaart is bevroren: alle codes zijn ongeldig." })
+                  : t("card.freezeNote", { defaultValue: "Kaart kwijt? Bevries hem en alle codes worden meteen ongeldig." })}
+            </p>
+            <Button type="button" size="sm" variant={ownerState.frozen ? "default" : "destructive"} disabled={!ownerState.available || busy === "freeze"} onClick={() => void toggleFreeze()}>
+              {ownerState.frozen ? t("card.unfreeze", { defaultValue: "Ontdooien" }) : t("card.freeze", { defaultValue: "Bevriezen" })}
+            </Button>
+          </div>
+        )}
 
         {card && code && (
           <div className="grid gap-2 rounded-2xl border border-border p-3">

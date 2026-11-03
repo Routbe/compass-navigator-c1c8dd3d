@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { optionalAuth } from "@/lib/auth/middleware";
+import { optionalAuth, requireAuth } from "@/lib/auth/middleware";
 
 /** Public: which wallets can issue passes right now (booleans only, never config values). */
 export const getWalletStatus = createServerFn({ method: "GET" }).handler(async () => {
@@ -49,13 +49,19 @@ export const getCardLiveness = createServerFn({ method: "POST" })
       const own = await generateWalletPayload(context.userId, { space: card.space, allowAccountId: true });
       owner = own?.serial === card.serial;
     }
+    const { cardFrozen } = await import("./card-freeze.server");
+    const freeze = await cardFrozen(card.serial);
+    const live = owner && !freeze.frozen;
     return {
+      owner,
+      frozen: freeze.frozen,
+      freezeAvailable: freeze.available,
       window: w,
       expiresAt: (w + 1) * LIVE_WINDOW_S * 1000,
       serverNow: now,
       seed: await liveSeed(key, card.serial, w),
-      code: owner ? await liveCode(key, card.serial, w) : null,
-      secureUrl: owner ? await secureUrlFor(card.handle, card.space, w, await liveCode(key, card.serial, w)) : null,
+      code: live ? await liveCode(key, card.serial, w) : null,
+      secureUrl: live ? await secureUrlFor(card.handle, card.space, w, await liveCode(key, card.serial, w)) : null,
     };
   });
 
@@ -82,6 +88,8 @@ export const verifySecureCardToken = createServerFn({ method: "POST" })
     const { liveCode } = await import("./card-liveness");
     const card = await generateWalletPayload(t.handle, { space: t.space });
     if (!card) return { status: "invalid" as const };
+    const { cardFrozen } = await import("./card-freeze.server");
+    if ((await cardFrozen(card.serial)).frozen) return { status: "frozen" as const };
     const expected = await liveCode(await livenessKey(), card.serial, t.window);
     let d = expected.length ^ t.code.length;
     for (let i = 0; i < expected.length; i++) d |= expected.charCodeAt(i) ^ (t.code.charCodeAt(i) || 0);
@@ -102,5 +110,20 @@ export const verifyCardLiveCode = createServerFn({ method: "POST" })
     const { verifyLiveCode } = await import("./card-liveness");
     const card = await generateWalletPayload(data.handle, { space: data.space });
     if (!card) return { valid: false, limited: false };
+    const { cardFrozen } = await import("./card-freeze.server");
+    if ((await cardFrozen(card.serial)).frozen) return { valid: false, limited: false };
     return { valid: await verifyLiveCode(await livenessKey(), card.serial, data.code, Date.now()), limited: false };
+  });
+
+/** Owner only: freeze or unfreeze their own card (lost or stolen). */
+export const setMyCardFrozen = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d: unknown) => z.object({ frozen: z.boolean(), space: z.enum(["root", "alias"]).optional() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { generateWalletPayload } = await import("./wallet-payload.server");
+    const own = await generateWalletPayload(context.userId, { space: data.space, allowAccountId: true });
+    if (!own) throw Object.assign(new Error("No card"), { statusCode: 404 });
+    const { setCardFrozen } = await import("./card-freeze.server");
+    await setCardFrozen(own.serial, context.userId, data.frozen);
+    return { frozen: data.frozen };
   });

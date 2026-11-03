@@ -53,6 +53,12 @@ function VerifyCard() {
           <h1 className="text-2xl font-bold">Code verlopen</h1>
           <p className="text-muted-foreground">Deze beveiligde QR-code is ouder dan een minuut. Vraag de kaarthouder om de kaart opnieuw te tonen.</p>
         </>
+      ) : r.status === "frozen" ? (
+        <>
+          <ShieldX className="h-14 w-14 text-destructive" aria-hidden />
+          <h1 className="text-2xl font-bold">Kaart bevroren</h1>
+          <p className="text-muted-foreground">De eigenaar heeft deze kaart geblokkeerd, bijvoorbeeld na verlies of diefstal. Vertrouw hem niet.</p>
+        </>
       ) : r.status === "limited" ? (
         <>
           <ShieldAlert className="h-14 w-14 text-muted-foreground" aria-hidden />
