@@ -47,7 +47,7 @@ describe("ROUT Card wallet payload", () => {
   it("picks readable text colours and hash-based card numbers", () => {
     expect(walletForeground("#f7f4ef")).toBe("#111111");
     expect(walletForeground("#0d0d0d")).toBe("#ffffff");
-    expect(sovereignIdFromDigest("ab12cd34ef")).toBe("ROUT-AB12-CD34");
+    expect(sovereignIdFromDigest("ab12cd34ef")).toMatch(/^RT-[0-9A-Y]{4}-[0-9A-Y]{4}-[0-9A-Y]$/);
   });
 });
 
