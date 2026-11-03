@@ -26,7 +26,8 @@ export const getWalletCard = createServerFn({ method: "GET" })
     const styled = applyCardDesign(card, await readCardDesign(card.serial));
     const { pickCardView } = await import("./card-liveness");
     // Allowlist, not a spread: only public card fields ever leave the server here.
-    return { ...pickCardView({ ...styled.card, avatarPath }), materialId: styled.materialId };
+    const view = pickCardView({ ...styled.card, avatarPath, materialId: styled.materialId as string | null });
+    return view;
   });
 
 const cardRef = z.object({ handle: z.string().trim().min(1).max(100).regex(/^@?[\w.-]+$/), space: z.enum(["root", "alias"]).optional() });
