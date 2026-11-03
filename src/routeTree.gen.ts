@@ -191,6 +191,7 @@ import { Route as SubscribeConfirmRouteImport } from './routes/subscribe.confirm
 import { Route as SubscribeLeaveRouteImport } from './routes/subscribe.leave'
 import { Route as SupportIndexRouteImport } from './routes/support.index'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
+import { Route as VerifyTokenRouteImport } from './routes/verify.$token'
 import { Route as WSlugRouteImport } from './routes/w.$slug'
 import { Route as WorkspaceTransferTokenRouteImport } from './routes/workspace-transfer.$token'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
@@ -1302,6 +1303,11 @@ const UUsernameRoute = UUsernameRouteImport.update({
   id: '/u/$username',
   path: '/u/$username',
   getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyTokenRoute = VerifyTokenRouteImport.update({
+  id: '/$token',
+  path: '/$token',
+  getParentRoute: () => VerifyRoute,
 } as any)
 const WSlugRoute = WSlugRouteImport.update({
   id: '/w/$slug',
@@ -2443,7 +2449,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/tour': typeof TourRoute
   '/vcard-qr': typeof VcardQrRoute
-  '/verify': typeof VerifyRoute
+  '/verify': typeof VerifyRouteWithChildren
   '/wifi-qr': typeof WifiQrRoute
   '/$username/$slug': typeof UsernameSlugRoute
   '/$username/ask': typeof UsernameAskRoute
@@ -2559,6 +2565,7 @@ export interface FileRoutesByFullPath {
   '/subscribe/confirm': typeof SubscribeConfirmRoute
   '/subscribe/leave': typeof SubscribeLeaveRoute
   '/u/$username': typeof UUsernameRoute
+  '/verify/$token': typeof VerifyTokenRoute
   '/w/$slug': typeof WSlugRoute
   '/workspace-transfer/$token': typeof WorkspaceTransferTokenRoute
   '/about/': typeof AboutIndexRoute
@@ -2810,7 +2817,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/tour': typeof TourRoute
   '/vcard-qr': typeof VcardQrRoute
-  '/verify': typeof VerifyRoute
+  '/verify': typeof VerifyRouteWithChildren
   '/wifi-qr': typeof WifiQrRoute
   '/$username/$slug': typeof UsernameSlugRoute
   '/$username/ask': typeof UsernameAskRoute
@@ -2923,6 +2930,7 @@ export interface FileRoutesByTo {
   '/subscribe/confirm': typeof SubscribeConfirmRoute
   '/subscribe/leave': typeof SubscribeLeaveRoute
   '/u/$username': typeof UUsernameRoute
+  '/verify/$token': typeof VerifyTokenRoute
   '/w/$slug': typeof WSlugRoute
   '/workspace-transfer/$token': typeof WorkspaceTransferTokenRoute
   '/about': typeof AboutIndexRoute
@@ -3186,7 +3194,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/tour': typeof TourRoute
   '/vcard-qr': typeof VcardQrRoute
-  '/verify': typeof VerifyRoute
+  '/verify': typeof VerifyRouteWithChildren
   '/wifi-qr': typeof WifiQrRoute
   '/$username_/$slug': typeof UsernameSlugRoute
   '/$username_/ask': typeof UsernameAskRoute
@@ -3302,6 +3310,7 @@ export interface FileRoutesById {
   '/subscribe/confirm': typeof SubscribeConfirmRoute
   '/subscribe/leave': typeof SubscribeLeaveRoute
   '/u/$username': typeof UUsernameRoute
+  '/verify/$token': typeof VerifyTokenRoute
   '/w/$slug': typeof WSlugRoute
   '/workspace-transfer/$token': typeof WorkspaceTransferTokenRoute
   '/about/': typeof AboutIndexRoute
@@ -3683,6 +3692,7 @@ export interface FileRouteTypes {
     | '/subscribe/confirm'
     | '/subscribe/leave'
     | '/u/$username'
+    | '/verify/$token'
     | '/w/$slug'
     | '/workspace-transfer/$token'
     | '/about/'
@@ -4047,6 +4057,7 @@ export interface FileRouteTypes {
     | '/subscribe/confirm'
     | '/subscribe/leave'
     | '/u/$username'
+    | '/verify/$token'
     | '/w/$slug'
     | '/workspace-transfer/$token'
     | '/about'
@@ -4425,6 +4436,7 @@ export interface FileRouteTypes {
     | '/subscribe/confirm'
     | '/subscribe/leave'
     | '/u/$username'
+    | '/verify/$token'
     | '/w/$slug'
     | '/workspace-transfer/$token'
     | '/about/'
@@ -4690,7 +4702,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TourRoute: typeof TourRoute
   VcardQrRoute: typeof VcardQrRoute
-  VerifyRoute: typeof VerifyRoute
+  VerifyRoute: typeof VerifyRouteWithChildren
   WifiQrRoute: typeof WifiQrRoute
   UsernameSlugRoute: typeof UsernameSlugRoute
   UsernameAskRoute: typeof UsernameAskRoute
@@ -6115,6 +6127,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/u/$username'
       preLoaderRoute: typeof UUsernameRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/verify/$token': {
+      id: '/verify/$token'
+      path: '/$token'
+      fullPath: '/verify/$token'
+      preLoaderRoute: typeof VerifyTokenRouteImport
+      parentRoute: typeof VerifyRoute
     }
     '/w/$slug': {
       id: '/w/$slug'
@@ -8034,6 +8053,17 @@ const SupportRouteChildren: SupportRouteChildren = {
 const SupportRouteWithChildren =
   SupportRoute._addFileChildren(SupportRouteChildren)
 
+interface VerifyRouteChildren {
+  VerifyTokenRoute: typeof VerifyTokenRoute
+}
+
+const VerifyRouteChildren: VerifyRouteChildren = {
+  VerifyTokenRoute: VerifyTokenRoute,
+}
+
+const VerifyRouteWithChildren =
+  VerifyRoute._addFileChildren(VerifyRouteChildren)
+
 interface QrPaymentRouteChildren {
   QrPaymentCryptoRoute: typeof QrPaymentCryptoRoute
   QrPaymentPaypalRoute: typeof QrPaymentPaypalRoute
@@ -8121,7 +8151,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TourRoute: TourRoute,
   VcardQrRoute: VcardQrRoute,
-  VerifyRoute: VerifyRoute,
+  VerifyRoute: VerifyRouteWithChildren,
   WifiQrRoute: WifiQrRoute,
   UsernameSlugRoute: UsernameSlugRoute,
   UsernameAskRoute: UsernameAskRoute,
