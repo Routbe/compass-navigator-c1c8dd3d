@@ -21,9 +21,12 @@ export const getWalletCard = createServerFn({ method: "GET" })
     const base = walletOrigin();
     // Same-origin path for drawing the photo on a canvas without CORS taint.
     const avatarPath = card.heroImageUrl?.startsWith(base) ? card.heroImageUrl.slice(base.length) : null;
+    const { readCardDesign } = await import("./card-freeze.server");
+    const { applyCardDesign } = await import("./card-design");
+    const styled = applyCardDesign(card, await readCardDesign(card.serial));
     const { pickCardView } = await import("./card-liveness");
     // Allowlist, not a spread: only public card fields ever leave the server here.
-    return pickCardView({ ...card, avatarPath });
+    return { ...pickCardView({ ...styled.card, avatarPath }), materialId: styled.materialId };
   });
 
 const cardRef = z.object({ handle: z.string().trim().min(1).max(100).regex(/^@?[\w.-]+$/), space: z.enum(["root", "alias"]).optional() });
@@ -54,10 +57,10 @@ export const getCardLiveness = createServerFn({ method: "POST" })
     const live = owner && !freeze.frozen;
     // Age tier is told to the owner only; visitors never learn a member is a minor.
     const { isMinorUser } = await import("@/lib/minor-safety.server");
-    const junior = owner && context.userId ? await isMinorUser(context.userId).catch(() => false) : false;
+    const minor = owner && context.userId ? await isMinorUser(context.userId).catch(() => false) : false;
     return {
       owner,
-      junior,
+      tier: (minor ? "minor" : "sovereign") as "minor" | "sovereign",
       frozen: freeze.frozen,
       freezeAvailable: freeze.available,
       window: w,
@@ -65,40 +68,39 @@ export const getCardLiveness = createServerFn({ method: "POST" })
       serverNow: now,
       seed: await liveSeed(key, card.serial, w),
       code: live ? await liveCode(key, card.serial, w) : null,
-      secureUrl: live ? await secureUrlFor(card.handle, card.space, w, await liveCode(key, card.serial, w)) : null,
     };
   });
 
-async function secureUrlFor(handle: string, space: "root" | "alias", window: number, code: string): Promise<string> {
-  const { walletOrigin } = await import("./wallet-payload.server");
-  const { encodeSecureToken } = await import("./card-token");
-  return `${walletOrigin()}/kaart/${encodeSecureToken({ handle: handle.replace(/^@/, ""), space, window, code })}`;
-}
+/**
+ * Owner only: a fresh secure QR (60 s, single-use nonce). The client asks
+ * every 45 s, so the back of the card always shows a live token.
+ */
+export const getSecureCardToken = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d: unknown) => z.object({ space: z.enum(["root", "alias"]).optional() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { generateWalletPayload, walletOrigin } = await import("./wallet-payload.server");
+    const own = await generateWalletPayload(context.userId, { space: data.space, allowAccountId: true });
+    if (!own) return null;
+    const { cardStatus } = await import("./card-freeze.server");
+    if ((await cardStatus(own.serial)) === "frozen") return { frozen: true as const };
+    const { livenessKey } = await import("./card-liveness.server");
+    const { signSecureToken } = await import("./card-token");
+    const now = Date.now();
+    const { token, payload } = await signSecureToken(await livenessKey(), { handle: own.handle, space: own.space, now });
+    return { frozen: false as const, url: `${walletOrigin()}/kaart/${token}`, iat: payload.iat, exp: payload.exp, serverNow: now };
+  });
 
-/** Public: check a secure QR from the back of a card. Expires with its window; rate limited. */
+/** Public: check a secure QR from the back of a card. Rate limited. */
 export const verifySecureCardToken = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ token: z.string().trim().min(10).max(200) }).parse(d))
+  .inputValidator((d: unknown) => z.object({ token: z.string().trim().min(20).max(600) }).parse(d))
   .handler(async ({ data }) => {
-    const { decodeSecureToken, tokenFresh } = await import("./card-token");
-    const t = decodeSecureToken(data.token);
-    if (!t) return { status: "invalid" as const };
     const { getRequest } = await import("@tanstack/react-start/server");
     const { hitRateLimit, clientIp } = await import("@/lib/rate-limit-db.server");
     const limit = await hitRateLimit("card-secure-verify", clientIp(getRequest()), { limit: 20, windowSec: 300 }, { failClosed: true });
     if (!limit.ok) return { status: "limited" as const };
-    if (!tokenFresh(t, Date.now())) return { status: "expired" as const };
-    const { generateWalletPayload } = await import("./wallet-payload.server");
-    const { livenessKey } = await import("./card-liveness.server");
-    const { liveCode } = await import("./card-liveness");
-    const card = await generateWalletPayload(t.handle, { space: t.space });
-    if (!card) return { status: "invalid" as const };
-    const { cardFrozen } = await import("./card-freeze.server");
-    if ((await cardFrozen(card.serial)).frozen) return { status: "frozen" as const };
-    const expected = await liveCode(await livenessKey(), card.serial, t.window);
-    let d = expected.length ^ t.code.length;
-    for (let i = 0; i < expected.length; i++) d |= expected.charCodeAt(i) ^ (t.code.charCodeAt(i) || 0);
-    if (d !== 0) return { status: "invalid" as const };
-    return { status: "valid" as const, handle: card.handle, displayName: card.displayName, sovereignId: card.sovereignId, url: card.url };
+    const { verifySecureCardTokenCore } = await import("./card-verify.server");
+    return verifySecureCardTokenCore(data.token);
   });
 
 /** Public: check a code a card holder shows you. Rate limited per visitor. */
@@ -130,4 +132,91 @@ export const setMyCardFrozen = createServerFn({ method: "POST" })
     const { setCardFrozen } = await import("./card-freeze.server");
     await setCardFrozen(own.serial, context.userId, data.frozen);
     return { frozen: data.frozen };
+  });
+
+const cmfInput = z.object({
+  space: z.enum(["root", "alias"]).optional(),
+  materialId: z.string().min(1).max(40),
+  accentHex: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  displayName: z.string().trim().min(1).max(40),
+  region: z.string().trim().max(40),
+});
+
+/** Owner only: validate (tier, contrast, privacy bot) and store the CMF production JSON. */
+export const saveMyCardDesign = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d: unknown) => cmfInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { checkCardText } = await import("./card-privacy");
+    const hit = checkCardText(data.displayName) ?? checkCardText(data.region);
+    if (hit) return { ok: false as const, error: "privacy" as const, hit };
+    const { isMinorUser } = await import("@/lib/minor-safety.server");
+    const tier = (await isMinorUser(context.userId).catch(() => true)) ? "minor" : "sovereign";
+    const { buildCmf } = await import("./card-cmf");
+    const r = buildCmf(data, tier);
+    if (!r.ok) return { ok: false as const, error: r.error };
+    const { generateWalletPayload } = await import("./wallet-payload.server");
+    const own = await generateWalletPayload(context.userId, { space: data.space, allowAccountId: true });
+    if (!own) throw Object.assign(new Error("No card"), { statusCode: 404 });
+    const { saveCardDesign } = await import("./card-freeze.server");
+    try {
+      await saveCardDesign(own.serial, context.userId, r.cmf);
+    } catch (err) {
+      if ((err as { statusCode?: number }).statusCode === 503) return { ok: false as const, error: "unavailable" as const };
+      throw err;
+    }
+    return { ok: true as const, cmf: r.cmf };
+  });
+
+/** Owner only: the member's physical keys (cards, wearables). */
+export const listMyPhysicalKeys = createServerFn({ method: "GET" })
+  .middleware([requireAuth])
+  .handler(async () => {
+    const { listMyKeys } = await import("./card-freeze.server");
+    return listMyKeys();
+  });
+
+/** Owner only: link a chip read through WebNFC (or typed in on iOS). */
+export const addMyPhysicalKey = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      space: z.enum(["root", "alias"]).optional(),
+      label: z.string().trim().max(40).optional(),
+      nfcUid: z.string().max(60).optional(),
+      publicKey: z.string().max(200).optional(),
+      keyAlg: z.enum(["Ed25519", "P-256"]).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { normalizeNfcUid, validPublicKey } = await import("./hardware-crypto");
+    const nfcUid = data.nfcUid ? normalizeNfcUid(data.nfcUid) : null;
+    if (data.nfcUid && !nfcUid) return { ok: false as const, error: "uid" as const };
+    if (data.publicKey && (!data.keyAlg || !validPublicKey(data.keyAlg, data.publicKey))) return { ok: false as const, error: "key" as const };
+    if (data.label) {
+      const { checkCardText } = await import("./card-privacy");
+      if (checkCardText(data.label)) return { ok: false as const, error: "privacy" as const };
+    }
+    const { generateWalletPayload } = await import("./wallet-payload.server");
+    const own = await generateWalletPayload(context.userId, { space: data.space, allowAccountId: true });
+    if (!own) throw Object.assign(new Error("No card"), { statusCode: 404 });
+    const { addMyKey } = await import("./card-freeze.server");
+    try {
+      const id = await addMyKey(context.userId, { serial: own.serial, label: data.label || null, nfcUid, publicKey: data.publicKey ?? null, keyAlg: data.publicKey ? data.keyAlg! : null });
+      return { ok: true as const, hardwareId: id };
+    } catch (err) {
+      const code = (err as { statusCode?: number }).statusCode;
+      if (code === 409) return { ok: false as const, error: "duplicate" as const };
+      if (code === 503) return { ok: false as const, error: "unavailable" as const };
+      throw err;
+    }
+  });
+
+/** Owner only: activate, freeze or revoke one physical key. Revoked is final. */
+export const setMyPhysicalKeyStatus = createServerFn({ method: "POST" })
+  .middleware([requireAuth])
+  .inputValidator((d: unknown) => z.object({ hardwareId: z.string().uuid(), status: z.enum(["active", "frozen", "revoked"]) }).parse(d))
+  .handler(async ({ data }) => {
+    const { setMyKeyStatus } = await import("./card-freeze.server");
+    return { ok: await setMyKeyStatus(data.hardwareId, data.status) };
   });
