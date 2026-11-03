@@ -18,6 +18,7 @@
 - [ ] 3D PASS card blueprint (dual QR, MRZ, hologram shaders) from the uploaded document.
 
 ## Full repository import
+- [ ] Connect original repository services one-to-one; no workspace connections are currently available.
 - [x] Copy complete repository source, assets, database scripts, and tests, excluding secrets and foreign project metadata.
 - [x] Verify public homepage, URL-to-QR studio navigation, phone menu and sign-in screen; 19 focused source tests pass and build succeeds.
 - [ ] Reconnect external database, authentication secrets, payments, email and storage (blocked on secure service configuration).
