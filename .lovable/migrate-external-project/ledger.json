@@ -10,36 +10,36 @@
     "capability": "schema",
     "source": "Original Neon",
     "outcome": "preserve",
-    "status": "pending",
-    "next_action": "Verify source runtime guard and schema through linked connection; do not run migrations."
+    "status": "partial",
+    "next_action": "Neon linked and exact source runtime guard passed; full schema parity remains unverified. No migrations applied."
   },
   {
     "capability": "records",
     "source": "Original Neon",
     "outcome": "preserve",
-    "status": "pending",
-    "next_action": "Verify existing application records without moving or overwriting them."
+    "status": "partial",
+    "next_action": "32 profile rows are readable through guarded original connection; no records moved or overwritten. Other relations remain unverified."
   },
   {
     "capability": "auth identities",
     "source": "ROUT cookie accounts",
     "outcome": "preserve",
     "status": "pending",
-    "next_action": "Supply original stable signing secrets securely and verify sign-in."
+    "next_action": "Supplied signing secrets saved securely. Real sign-in remains pending original email/OAuth settings and account interaction."
   },
   {
     "capability": "authorization",
     "source": "ROUT guarded rout_app access",
     "outcome": "preserve",
-    "status": "pending",
-    "next_action": "Verify exact runtime guard; never weaken it."
+    "status": "partial",
+    "next_action": "Exact runtime guard passed with rout_app, no superuser or RLS bypass. Cross-account isolation still requires authenticated verification."
   },
   {
     "capability": "uploaded file bytes",
     "source": "Scaleway",
     "outcome": "preserve",
     "status": "blocked",
-    "next_action": "Connect original object storage and buckets securely."
+    "next_action": "Storage/email secure settings form declined; retained original adapters remain unconfigured."
   },
   {
     "capability": "external providers",
@@ -81,7 +81,7 @@
     "source": "Original secure deployment configuration",
     "outcome": "preserve",
     "status": "blocked",
-    "next_action": "Collect through secure forms, never copy source .env."
+    "next_action": "Five supplied original signing/encryption secrets stored. Provider secrets remain missing; never copy source .env."
   },
   {
     "capability": "cutover",
