@@ -4,7 +4,7 @@
  * the moving light and the shader clock; per-frame state lives in refs.
  * Text is SDF (troika, generated in a worker) so it stays sharp at any zoom.
  */
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, Lightformer, Text } from "@react-three/drei";
 import * as THREE from "three";
