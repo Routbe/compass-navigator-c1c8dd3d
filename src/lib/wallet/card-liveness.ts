@@ -76,7 +76,7 @@ export async function verifyLiveCode(key: Uint8Array, serial: string, input: str
  */
 export const CARD_VIEW_FIELDS = [
   "serial", "handle", "space", "displayName", "subheader", "url", "qrValue",
-  "hexBackgroundColor", "hexForegroundColor", "sovereignId", "regionDisplay", "avatarPath",
+  "hexBackgroundColor", "hexForegroundColor", "sovereignId", "regionDisplay", "avatarPath", "materialId",
 ] as const;
 export type CardViewField = (typeof CARD_VIEW_FIELDS)[number];
 

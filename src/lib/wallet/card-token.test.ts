@@ -1,23 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { decodeSecureToken, encodeSecureToken, tokenFresh } from "./card-token";
-import { LIVE_WINDOW_S } from "./card-liveness";
+import { SECURE_TTL_MS, signSecureToken, verifySecureToken } from "./card-token";
 
-describe("secure card token", () => {
-  it("round-trips", () => {
-    const t = { space: "alias" as const, handle: "le.na", window: 58_000_123, code: "AB12CD" };
-    expect(decodeSecureToken(encodeSecureToken(t))).toEqual(t);
+const key = new Uint8Array(32).fill(7);
+const other = new Uint8Array(32).fill(8);
+const now = 1_800_000_000_000;
+
+describe("secure card token v2", () => {
+  it("verifies a fresh token", async () => {
+    const { token, payload } = await signSecureToken(key, { handle: "@Le.na", space: "alias", now });
+    const r = await verifySecureToken(key, token, now + 1000);
+    expect(r).toEqual({ ok: true, payload });
+    expect(payload.h).toBe("le.na");
   });
-  it("rejects tampered tokens", () => {
-    expect(decodeSecureToken("v1.x.lena.abc.AB12CD")).toBeNull();
-    expect(decodeSecureToken("v1.r.lena.abc.AB12C")).toBeNull();
-    expect(decodeSecureToken("v1.r.le/na.abc.AB12CD")).toBeNull();
-    expect(decodeSecureToken("v2.r.lena.abc.AB12CD")).toBeNull();
+  it("expires after exactly 60 seconds", async () => {
+    const { token } = await signSecureToken(key, { handle: "lena", space: "root", now });
+    expect((await verifySecureToken(key, token, now + SECURE_TTL_MS)).ok).toBe(true);
+    expect(await verifySecureToken(key, token, now + SECURE_TTL_MS + 1)).toEqual({ ok: false, reason: "expired" });
   });
-  it("expires after the neighbouring window (max 90 s)", () => {
-    const now = 1_800_000_000_000;
-    const w = Math.floor(now / 1000 / LIVE_WINDOW_S);
-    const t = { space: "root" as const, handle: "lena", window: w, code: "AB12CD" };
-    expect(tokenFresh(t, now + LIVE_WINDOW_S * 1000)).toBe(true);
-    expect(tokenFresh(t, now + 2 * LIVE_WINDOW_S * 1000)).toBe(false);
+  it("rejects a token signed with another key", async () => {
+    const { token } = await signSecureToken(other, { handle: "lena", space: "root", now });
+    expect(await verifySecureToken(key, token, now)).toEqual({ ok: false, reason: "invalid" });
+  });
+  it("rejects a tampered payload", async () => {
+    const { token } = await signSecureToken(key, { handle: "lena", space: "root", now });
+    const [, sig] = token.split(".");
+    const forged = btoa(JSON.stringify({ v: 2, h: "admin", s: "r", iat: now, exp: now + SECURE_TTL_MS, n: "A".repeat(22) })).replace(/=+$/, "");
+    expect(await verifySecureToken(key, `${forged}.${sig}`, now)).toEqual({ ok: false, reason: "invalid" });
+  });
+  it("gives every token a unique nonce", async () => {
+    const a = await signSecureToken(key, { handle: "lena", space: "root", now });
+    const b = await signSecureToken(key, { handle: "lena", space: "root", now });
+    expect(a.payload.n).not.toBe(b.payload.n);
   });
 });

@@ -1,3 +1,4 @@
+import { cardNumberFromDigest } from "./card-number";
 /**
  * Wallet pass content for profiles and events (pure, browser-safe).
  * Apple (.pkpass pass.json) and Google (Generic pass object) are built from the
@@ -171,10 +172,9 @@ export function walletForeground(bg: string): string {
   return lum > 0.45 ? "#111111" : "#ffffff";
 }
 
-/** Card number from a SHA-256 hex digest: ROUT-XXXX-XXXX. */
+/** Card number from a keyed SHA-256 hex digest: RT-XXXX-XXXX-C (see card-number.ts). */
 export function sovereignIdFromDigest(hex: string): string {
-  const h = hex.replace(/[^0-9a-f]/gi, "").toUpperCase().padEnd(8, "0");
-  return `ROUT-${h.slice(0, 4)}-${h.slice(4, 8)}`;
+  return cardNumberFromDigest(hex.replace(/[^0-9a-f]/gi, "").padEnd(16, "0"));
 }
 
 /** Turns stored image paths into an absolute same-origin URL; anything else is dropped. */
