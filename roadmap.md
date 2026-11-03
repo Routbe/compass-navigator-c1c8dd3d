@@ -18,7 +18,10 @@
 - [ ] 3D PASS card blueprint (dual QR, MRZ, hologram shaders) from the uploaded document.
 
 ## Full repository import
-- [ ] Connect original repository services one-to-one; no workspace connections are currently available.
+- [x] Link original Neon connection and verify the exact rout_app safety guard; 32 profile rows are readable without modifying data.
+- [x] Store supplied original account signing and payment/wallet encryption settings securely.
 - [x] Copy complete repository source, assets, database scripts, and tests, excluding secrets and foreign project metadata.
 - [x] Verify public homepage, URL-to-QR studio navigation, phone menu and sign-in screen; 19 focused source tests pass and build succeeds.
-- [ ] Reconnect external database, authentication secrets, payments, email and storage (blocked on secure service configuration).
+- [ ] Verify real account sign-in (blocked: account interaction and original email/OAuth settings).
+- [ ] Connect storage and email (blocked: secure settings form was declined).
+- [ ] Connect Stripe, social sign-in, wallet signing and standalone worker (blocked: original provider credentials and separate worker deployment).
