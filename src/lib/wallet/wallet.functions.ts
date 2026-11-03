@@ -52,8 +52,12 @@ export const getCardLiveness = createServerFn({ method: "POST" })
     const { cardFrozen } = await import("./card-freeze.server");
     const freeze = await cardFrozen(card.serial);
     const live = owner && !freeze.frozen;
+    // Age tier is told to the owner only; visitors never learn a member is a minor.
+    const { isMinorUser } = await import("@/lib/minor-safety.server");
+    const junior = owner && context.userId ? await isMinorUser(context.userId).catch(() => false) : false;
     return {
       owner,
+      junior,
       frozen: freeze.frozen,
       freezeAvailable: freeze.available,
       window: w,
