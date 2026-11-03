@@ -40,17 +40,15 @@ function VerifyCard() {
           <ShieldCheck className="h-14 w-14 text-primary" aria-hidden />
           <h1 className="text-2xl font-bold">Echte ROUT Card</h1>
           <p className="text-muted-foreground">Deze code is nu geldig en komt van de kaarthouder.</p>
-          <div className="w-full rounded-2xl border border-border p-4">
-            <p className="text-lg font-semibold">{r.displayName}</p>
-            <p className="text-sm text-muted-foreground">@{r.handle}</p>
-            <p className="mt-2 font-mono text-xs tracking-widest text-muted-foreground">{r.sovereignId}</p>
+          <div className="flex w-full items-center gap-3 rounded-2xl border border-border p-4 text-left">
+            {r.avatar_url && <img src={r.avatar_url} alt="" className="h-12 w-12 rounded-full object-cover" />}
+            <p className="text-lg font-semibold">{r.display_name}</p>
           </div>
-          <a href={r.url} className="text-sm font-medium text-primary underline-offset-4 hover:underline">Bekijk het publieke profiel</a>
         </>
-      ) : r.status === "expired" ? (
+      ) : r.status === "expired" || r.status === "replayed" ? (
         <>
           <ShieldAlert className="h-14 w-14 text-destructive" aria-hidden />
-          <h1 className="text-2xl font-bold">Code verlopen</h1>
+          <h1 className="text-2xl font-bold">{r.status === "replayed" ? "Code al gebruikt" : "Code verlopen"}</h1>
           <p className="text-muted-foreground">Deze beveiligde QR-code is ouder dan een minuut. Vraag de kaarthouder om de kaart opnieuw te tonen.</p>
         </>
       ) : r.status === "frozen" ? (
