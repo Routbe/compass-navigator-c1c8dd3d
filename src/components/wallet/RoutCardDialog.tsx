@@ -9,12 +9,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { downloadVCard } from "@/lib/vcard";
-import { getCardLiveness, getWalletCard, getWalletStatus, setMyCardFrozen, verifyCardLiveCode } from "@/lib/wallet/wallet.functions";
+import { getCardLiveness, getSecureCardToken, getWalletCard, getWalletStatus, saveMyCardDesign, setMyCardFrozen, verifyCardLiveCode } from "@/lib/wallet/wallet.functions";
 import { pickCardView } from "@/lib/wallet/card-liveness";
-import { MIN_TEXT_CONTRAST, validateCardStyle } from "@/lib/wallet/card-style";
+import { contrastRatio } from "@/lib/wallet/card-style";
+import { CARD_MATERIALS, defaultMaterial, materialsFor, nearestSafeAccent, type AgeTier, type CardMaterial } from "@/lib/wallet/card-cmf";
+import { checkCardText, PRIVACY_MESSAGE } from "@/lib/wallet/card-privacy";
+import { SECURE_ROTATE_MS } from "@/lib/wallet/card-token";
+import { CardKeysPanel } from "./CardKeysPanel";
 import type { WalletStatus } from "@/lib/wallet/wallet-pass";
 import { drawCardFaces, hasWebGL, type CardFaces } from "./card-faces";
-import type { CardFinish, LiveRef, TiltRef, ZoomRef } from "./RoutCard3D";
+import type { CardFinish, LiveRef, SecureRef, TiltRef, ZoomRef } from "./RoutCard3D";
 
 const RoutCard3D = lazy(() => import("./RoutCard3D"));
 
@@ -46,8 +50,8 @@ function FlatCard({ faces, flipped, tilt, onFlip }: { faces: { front: string; ba
   );
 }
 
-function defaultFinish(fg: string): CardFinish {
-  return fg === "#111111" ? "glass" : "metal";
+function defaultMaterialFor(fg: string): CardMaterial {
+  return CARD_MATERIALS.find((m) => m.id === (fg === "#111111" ? "frosted-alpine-glass" : "obsidian-titanium"))!;
 }
 
 /**
@@ -64,7 +68,6 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
   const [images, setImages] = useState<{ front: string; back: string } | null>(null);
   const [webgl, setWebgl] = useState<boolean | null>(null);
   const [flipped, setFlipped] = useState(false);
-  const [finish, setFinish] = useState<CardFinish>("metal");
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [gyro, setGyro] = useState(false);
@@ -76,12 +79,32 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
   const [code, setCode] = useState<string | null>(null);
   const [secureUrl, setSecureUrl] = useState<string | null>(null);
   const [ownerState, setOwnerState] = useState<{ owner: boolean; frozen: boolean; available: boolean }>({ owner: false, frozen: false, available: false });
-  const [junior, setJunior] = useState(false);
+  const [tier, setTier] = useState<AgeTier>("sovereign");
+  const secure: SecureRef = useRef({ iat: 0, exp: 0 });
+  const loadSecure = useServerFn(getSecureCardToken);
+  const saveDesign = useServerFn(saveMyCardDesign);
+  // CMF studio (owner): material, accent, printed text. Visitors see the saved design.
+  const [materialId, setMaterialId] = useState<string | null>(null);
+  const [accent, setAccent] = useState<string | null>(null);
+  const [accentNote, setAccentNote] = useState<string | null>(null);
+  const [nameText, setNameText] = useState<string | null>(null);
+  const [regionText, setRegionText] = useState("");
   const [liveNonce, setLiveNonce] = useState(0);
   const freezeCard = useServerFn(setMyCardFrozen);
-  const [accent, setAccent] = useState<string | null>(null);
-  const accentCheck = card && accent ? validateCardStyle(accent, card.hexBackgroundColor) : null;
-  const styledCard = card && accent && accentCheck?.ok ? { ...card, hexForegroundColor: accent } : card;
+  const material: CardMaterial = (CARD_MATERIALS.find((m) => m.id === (materialId ?? card?.materialId)) ?? (card ? defaultMaterialFor(card.hexForegroundColor) : CARD_MATERIALS[0]))!;
+  const finish: CardFinish = material.junior ? "junior" : material.finish;
+  const accentHex = accent ?? card?.hexForegroundColor ?? "#ffffff";
+  const nameHit = nameText !== null ? checkCardText(nameText) : null;
+  const regionHit = regionText ? checkCardText(regionText) : null;
+  const styledCard = card
+    ? {
+        ...card,
+        hexBackgroundColor: materialId || card.materialId ? material.baseHex : card.hexBackgroundColor,
+        hexForegroundColor: accentHex,
+        displayName: nameText && !nameHit ? nameText : card.displayName,
+        ...(regionText && !regionHit ? { regionDisplay: regionText } : {}),
+      }
+    : card;
   const [verifyInput, setVerifyInput] = useState("");
   const [verdict, setVerdict] = useState<"valid" | "invalid" | "limited" | null>(null);
   const loadLive = useServerFn(getCardLiveness);
@@ -96,16 +119,12 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
   }, [open, card, handle, space, loadCard, loadStatus]);
 
   useEffect(() => {
-    if (card) setFinish(defaultFinish(card.hexForegroundColor));
-  }, [card]);
-
-  useEffect(() => {
     const card = styledCard;
-    const tier = finish === "junior" ? ("junior" as const) : ("adult" as const);
+    const faceTier = finish === "junior" ? ("junior" as const) : ("adult" as const);
     if (!card || webgl === null) return;
     let alive = true;
     // WebGL draws names as SDF text; the CSS fallback keeps them printed.
-    void Promise.all([drawCardFaces(card, { sdfText: webgl, secureQr: secureUrl, tier }), drawCardFaces(card, { secureQr: secureUrl, tier })]).then(([gl, flat]) => {
+    void Promise.all([drawCardFaces(card, { sdfText: webgl, secureQr: secureUrl, tier: faceTier }), drawCardFaces(card, { secureQr: secureUrl, tier: faceTier })]).then(([gl, flat]) => {
       if (!alive) return;
       setFaces(gl);
       setImages({ front: flat.front.toDataURL("image/png"), back: flat.back.toDataURL("image/png") });
@@ -115,11 +134,76 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [card, webgl, secureUrl, accentCheck?.ok ? accent : null, finish === "junior"]);
+  }, [card, webgl, secureUrl, styledCard?.hexBackgroundColor, styledCard?.hexForegroundColor, styledCard?.displayName, styledCard && "regionDisplay" in styledCard ? styledCard.regionDisplay : "", finish === "junior"]);
 
+  // A minor whose saved/default material is outside their tier gets the first allowed one.
   useEffect(() => {
-    if (junior) setFinish("junior");
-  }, [junior]);
+    if (ownerState.owner && !material.tiers.includes(tier)) setMaterialId(defaultMaterial(tier).id);
+  }, [ownerState.owner, tier, material]);
+
+  // Secure QR (owner): fresh 60 s single-use token every 45 s, off-thread from the render loop.
+  useEffect(() => {
+    if (!open || !ownerState.owner || ownerState.frozen) {
+      secure.current = { iat: 0, exp: 0 };
+      setSecureUrl(null);
+      return;
+    }
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = async () => {
+      try {
+        const r = await loadSecure({ data: { space } });
+        if (!alive) return;
+        if (!r || r.frozen) {
+          secure.current = { iat: 0, exp: 0 };
+          setSecureUrl(null);
+          return;
+        }
+        const skew = Date.now() - r.serverNow;
+        secure.current = { iat: r.iat + skew, exp: r.exp + skew };
+        setSecureUrl(r.url);
+        timer = setTimeout(() => void tick(), SECURE_ROTATE_MS);
+      } catch {
+        if (alive) timer = setTimeout(() => void tick(), 10_000);
+      }
+    };
+    void tick();
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [open, ownerState.owner, ownerState.frozen, space, loadSecure, liveNonce]);
+
+  const pickAccent = (hex: string) => {
+    const safe = nearestSafeAccent(hex, material.baseHex);
+    setAccent(safe);
+    setAccentNote(safe !== hex.toLowerCase() ? t("card.accentSnapped", { defaultValue: "Kleur genegeerd: Onvoldoende contrast voor fysieke leesbaarheid en toegankelijkheid." }) : null);
+  };
+
+  const pickMaterial = (m: CardMaterial) => {
+    setMaterialId(m.id);
+    const safe = nearestSafeAccent(accentHex, m.baseHex);
+    if (safe !== accentHex.toLowerCase()) {
+      setAccent(safe);
+      setAccentNote(t("card.accentSnapped", { defaultValue: "Kleur genegeerd: Onvoldoende contrast voor fysieke leesbaarheid en toegankelijkheid." }));
+    }
+  };
+
+  const saveStudio = async () => {
+    if (!card || nameHit || regionHit) return;
+    setBusy("design");
+    try {
+      const r = await saveDesign({ data: { space, materialId: material.id, accentHex, displayName: (nameText ?? card.displayName).trim() || card.displayName, region: regionText.trim() } });
+      if (r.ok) toast.success(t("card.designSaved", { defaultValue: "Ontwerp opgeslagen als productiebestand." }));
+      else if (r.error === "privacy") toast.error(PRIVACY_MESSAGE);
+      else if (r.error === "unavailable") toast.error(t("card.designUnavailable", { defaultValue: "Ontwerpen opslaan is nog niet ingesteld in de database." }));
+      else toast.error(t("card.designRejected", { defaultValue: "Dit ontwerp kan niet: kies een ander materiaal of een leesbaardere kleur." }));
+    } catch {
+      toast.error(t("card.designFailed", { defaultValue: "Opslaan lukt nu niet." }));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   // Live proof-of-now: new seed (and the owner's code) every server window.
   useEffect(() => {
@@ -133,9 +217,8 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
         const skew = Date.now() - r.serverNow;
         live.current = { seed: r.seed, expiresAt: r.expiresAt + skew, windowMs: 30_000 };
         setCode(r.code);
-        setSecureUrl(r.secureUrl ?? null);
         setOwnerState({ owner: r.owner, frozen: r.frozen, available: r.freezeAvailable });
-        setJunior(r.junior);
+        setTier(r.tier);
         timer = setTimeout(() => void tick(), Math.max(1000, r.expiresAt + skew - Date.now() + 250));
       } catch {
         if (alive) timer = setTimeout(() => void tick(), 10_000);
@@ -295,33 +378,20 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
                 <RoutCard3D
                   faces={faces}
                   finish={finish}
+                  pbr={material}
+                  secure={secure}
                   flipped={flipped}
                   tilt={tilt}
                   live={live}
                   zoom={zoom}
                   onFlip={flip}
                   onReady={() => setReady(true)}
-                  text={{ displayName: card!.displayName, handle: card!.handle, subheader: card!.subheader, fg: styledCard!.hexForegroundColor, sovereignId: card!.sovereignId, code }}
+                  text={{ displayName: styledCard!.displayName, handle: card!.handle, subheader: styledCard && "regionDisplay" in styledCard && styledCard.regionDisplay ? styledCard.regionDisplay : card!.subheader, fg: styledCard!.hexForegroundColor, sovereignId: card!.sovereignId, code }}
                 />
               </Suspense>
             </GlBoundary>
           ) : (
             <div className="flex h-full items-center p-4">{flat}</div>
-          )}
-          {faces && (
-            <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
-              {(junior ? (["junior", "metal", "glass", "holo"] as const) : (["metal", "glass", "holo"] as const)).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setFinish(f)}
-                  aria-pressed={finish === f}
-                  className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium backdrop-blur", finish === f ? "border-foreground bg-foreground text-background" : "border-border bg-background/70")}
-                >
-                  {t(`card.finish.${f}`, { defaultValue: f === "junior" ? "Junior" : f })}
-                </button>
-              ))}
-            </div>
           )}
         </div>
 
@@ -350,22 +420,52 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
           </div>
         )}
 
-        {card && code && (
-          <div className="grid gap-2 rounded-2xl border border-border p-3">
-            <label htmlFor="rout-accent" className="text-xs font-medium">{t("card.accent", { defaultValue: "Accentkleur van je kaart" })}</label>
-            <div className="flex items-center gap-2">
-              <input id="rout-accent" type="color" value={accent ?? card.hexForegroundColor} onChange={(e) => setAccent(e.target.value)} className="h-9 w-12 cursor-pointer rounded-md border border-border bg-transparent" />
-              {accent && <Button type="button" size="sm" variant="ghost" onClick={() => setAccent(null)}>{t("card.accentReset", { defaultValue: "Standaard" })}</Button>}
+        {card && ownerState.owner && (
+          <section className="grid gap-3 rounded-2xl border border-border p-3" aria-labelledby="rout-cmf-title">
+            <div className="flex items-baseline justify-between">
+              <h3 id="rout-cmf-title" className="text-sm font-semibold">{t("card.studio", { defaultValue: "Materiaal & afwerking" })}</h3>
+              <span className="text-[11px] text-muted-foreground">{tier === "minor" ? t("card.tierMinor", { defaultValue: "Junior-tier" }) : t("card.tierSovereign", { defaultValue: "Sovereign-tier" })}</span>
             </div>
-            {accentCheck && (
-              <p role="status" className={cn("text-xs", accentCheck.ok ? "text-muted-foreground" : "text-destructive")}>
-                {accentCheck.ok
-                  ? t("card.accentOk", { defaultValue: "Goed leesbaar (contrast {{r}}:1).", r: accentCheck.ratio })
-                  : t("card.accentLow", { defaultValue: "Te weinig contrast ({{r}}:1, minimaal {{min}}:1). Deze kleur wordt niet gebruikt.", r: accentCheck.ratio, min: MIN_TEXT_CONTRAST })}
-              </p>
-            )}
-          </div>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t("card.studio", { defaultValue: "Materiaal & afwerking" })}>
+              {materialsFor(tier).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={material.id === m.id}
+                  onClick={() => pickMaterial(m)}
+                  className={cn("flex items-center gap-2 rounded-xl border p-2 text-left text-xs transition-colors", material.id === m.id ? "border-foreground bg-muted" : "border-border hover:bg-muted/50")}
+                >
+                  <span aria-hidden className="h-7 w-7 shrink-0 rounded-md border border-border" style={{ background: `linear-gradient(135deg, ${m.baseHex}, ${m.finish === "holo" ? "#7dd3fc" : m.baseHex})` }} />
+                  <span className="grid">
+                    <span className="font-medium">{m.name}</span>
+                    <span className="text-[10px] text-muted-foreground">M {m.metalness.toFixed(2)} · R {m.roughness.toFixed(2)}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="grid gap-1.5">
+              <label htmlFor="rout-accent" className="text-xs font-medium">{t("card.accent", { defaultValue: "Accentkleur (tekst, ring, logo)" })}</label>
+              <div className="flex items-center gap-2">
+                <input id="rout-accent" type="color" value={accentHex} onChange={(e) => pickAccent(e.target.value)} className="h-9 w-12 cursor-pointer rounded-md border border-border bg-transparent" />
+                <span className="text-xs text-muted-foreground">{t("card.contrast", { defaultValue: "Contrast {{r}}:1", r: contrastRatio(accentHex, material.baseHex).toFixed(2) })}</span>
+              </div>
+              {accentNote && <p role="status" className="text-xs text-muted-foreground">{accentNote}</p>}
+            </div>
+            <div className="grid gap-1.5">
+              <label htmlFor="rout-card-name" className="text-xs font-medium">{t("card.nameOnCard", { defaultValue: "Naam op de kaart" })}</label>
+              <Input id="rout-card-name" value={nameText ?? card.displayName} maxLength={40} onChange={(e) => setNameText(e.target.value)} aria-invalid={!!nameHit} className={cn("h-9", nameHit && "border-destructive focus-visible:ring-destructive")} />
+              <label htmlFor="rout-card-region" className="text-xs font-medium">{t("card.regionOnCard", { defaultValue: "Regio (bv. Brussel, BE)" })}</label>
+              <Input id="rout-card-region" value={regionText} maxLength={40} onChange={(e) => setRegionText(e.target.value)} aria-invalid={!!regionHit} className={cn("h-9", regionHit && "border-destructive focus-visible:ring-destructive")} />
+              {(nameHit || regionHit) && <p role="alert" className="text-xs text-destructive">{PRIVACY_MESSAGE}</p>}
+            </div>
+            <Button type="button" size="sm" onClick={() => void saveStudio()} disabled={busy !== null || !!nameHit || !!regionHit}>
+              {busy === "design" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null} {t("card.saveDesign", { defaultValue: "Ontwerp opslaan" })}
+            </Button>
+          </section>
         )}
+
+        {card && ownerState.owner && <CardKeysPanel space={space} />}
 
         {card && (
           <div className="rounded-2xl border border-border p-3">
