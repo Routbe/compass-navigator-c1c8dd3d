@@ -62,7 +62,7 @@ export const getCardLiveness = createServerFn({ method: "POST" })
 async function secureUrlFor(handle: string, space: "root" | "alias", window: number, code: string): Promise<string> {
   const { walletOrigin } = await import("./wallet-payload.server");
   const { encodeSecureToken } = await import("./card-token");
-  return `${walletOrigin()}/verify/${encodeSecureToken({ handle: handle.replace(/^@/, ""), space, window, code })}`;
+  return `${walletOrigin()}/kaart/${encodeSecureToken({ handle: handle.replace(/^@/, ""), space, window, code })}`;
 }
 
 /** Public: check a secure QR from the back of a card. Expires with its window; rate limited. */

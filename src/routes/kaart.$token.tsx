@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
 import { verifySecureCardToken } from "@/lib/wallet/wallet.functions";
 
-export const Route = createFileRoute("/verify/$token")({
+export const Route = createFileRoute("/kaart/$token")({
   head: () => ({
     meta: [
       { title: "ROUT Card controle · ROUT" },
