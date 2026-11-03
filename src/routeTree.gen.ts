@@ -157,6 +157,7 @@ import { Route as InfoQrStudioRouteImport } from './routes/info.qr-studio'
 import { Route as InfoTipsRouteImport } from './routes/info.tips'
 import { Route as InfoUsernamesRouteImport } from './routes/info.usernames'
 import { Route as InfoWalletRouteImport } from './routes/info.wallet'
+import { Route as KaartTokenRouteImport } from './routes/kaart.$token'
 import { Route as OauthAuthorizeRouteImport } from './routes/oauth.authorize'
 import { Route as OauthEndSessionRouteImport } from './routes/oauth.end-session'
 import { Route as ProductIndexRouteImport } from './routes/product.index'
@@ -1130,6 +1131,11 @@ const InfoWalletRoute = InfoWalletRouteImport.update({
   id: '/wallet',
   path: '/wallet',
   getParentRoute: () => InfoRoute,
+} as any)
+const KaartTokenRoute = KaartTokenRouteImport.update({
+  id: '/kaart/$token',
+  path: '/kaart/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const OauthAuthorizeRoute = OauthAuthorizeRouteImport.update({
   id: '/oauth/authorize',
@@ -2530,6 +2536,7 @@ export interface FileRoutesByFullPath {
   '/info/tips': typeof InfoTipsRoute
   '/info/usernames': typeof InfoUsernamesRoute
   '/info/wallet': typeof InfoWalletRoute
+  '/kaart/$token': typeof KaartTokenRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/oauth/end-session': typeof OauthEndSessionRoute
   '/product/batch-engine': typeof ProductBatchEngineRoute
@@ -2895,6 +2902,7 @@ export interface FileRoutesByTo {
   '/info/tips': typeof InfoTipsRoute
   '/info/usernames': typeof InfoUsernamesRoute
   '/info/wallet': typeof InfoWalletRoute
+  '/kaart/$token': typeof KaartTokenRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/oauth/end-session': typeof OauthEndSessionRoute
   '/product/batch-engine': typeof ProductBatchEngineRoute
@@ -3273,6 +3281,7 @@ export interface FileRoutesById {
   '/info/tips': typeof InfoTipsRoute
   '/info/usernames': typeof InfoUsernamesRoute
   '/info/wallet': typeof InfoWalletRoute
+  '/kaart/$token': typeof KaartTokenRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/oauth/end-session': typeof OauthEndSessionRoute
   '/product/batch-engine': typeof ProductBatchEngineRoute
@@ -3654,6 +3663,7 @@ export interface FileRouteTypes {
     | '/info/tips'
     | '/info/usernames'
     | '/info/wallet'
+    | '/kaart/$token'
     | '/oauth/authorize'
     | '/oauth/end-session'
     | '/product/batch-engine'
@@ -4019,6 +4029,7 @@ export interface FileRouteTypes {
     | '/info/tips'
     | '/info/usernames'
     | '/info/wallet'
+    | '/kaart/$token'
     | '/oauth/authorize'
     | '/oauth/end-session'
     | '/product/batch-engine'
@@ -4396,6 +4407,7 @@ export interface FileRouteTypes {
     | '/info/tips'
     | '/info/usernames'
     | '/info/wallet'
+    | '/kaart/$token'
     | '/oauth/authorize'
     | '/oauth/end-session'
     | '/product/batch-engine'
@@ -4723,6 +4735,7 @@ export interface RootRouteChildren {
   FeedbackSlugRoute: typeof FeedbackSlugRoute
   GiftCodeRoute: typeof GiftCodeRoute
   IdentityRevokeRoute: typeof IdentityRevokeRoute
+  KaartTokenRoute: typeof KaartTokenRoute
   OauthAuthorizeRoute: typeof OauthAuthorizeRoute
   OauthEndSessionRoute: typeof OauthEndSessionRoute
   QrPaymentRoute: typeof QrPaymentRouteWithChildren
@@ -5877,6 +5890,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/info/wallet'
       preLoaderRoute: typeof InfoWalletRouteImport
       parentRoute: typeof InfoRoute
+    }
+    '/kaart/$token': {
+      id: '/kaart/$token'
+      path: '/kaart/$token'
+      fullPath: '/kaart/$token'
+      preLoaderRoute: typeof KaartTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/oauth/authorize': {
       id: '/oauth/authorize'
@@ -8154,6 +8174,7 @@ const rootRouteChildren: RootRouteChildren = {
   FeedbackSlugRoute: FeedbackSlugRoute,
   GiftCodeRoute: GiftCodeRoute,
   IdentityRevokeRoute: IdentityRevokeRoute,
+  KaartTokenRoute: KaartTokenRoute,
   OauthAuthorizeRoute: OauthAuthorizeRoute,
   OauthEndSessionRoute: OauthEndSessionRoute,
   QrPaymentRoute: QrPaymentRouteWithChildren,
