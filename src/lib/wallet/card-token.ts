@@ -9,7 +9,7 @@ import { LIVE_CODE_LEN, LIVE_SKEW_WINDOWS, liveWindow } from "./card-liveness";
 
 export type SecureToken = { space: "root" | "alias"; handle: string; window: number; code: string };
 
-const HANDLE = /^[\w-]{1,100}$/;
+const HANDLE = /^[\w.-]{1,100}$/;
 const CODE = new RegExp(`^[0-9A-HJKMNP-TV-Z]{${LIVE_CODE_LEN}}$`);
 
 export function encodeSecureToken(t: SecureToken): string {
@@ -19,8 +19,10 @@ export function encodeSecureToken(t: SecureToken): string {
 
 export function decodeSecureToken(raw: string): SecureToken | null {
   const parts = raw.trim().split(".");
-  if (parts.length !== 5 || parts[0] !== "v1") return null;
-  const [, s, handle, w, code] = parts as [string, string, string, string, string];
+  if (parts.length < 5 || parts[0] !== "v1") return null;
+  const s = parts[1]!;
+  const handle = parts.slice(2, -2).join(".");
+  const [w, code] = parts.slice(-2) as [string, string];
   if ((s !== "r" && s !== "a") || !HANDLE.test(handle) || !CODE.test(code) || !/^[0-9a-z]{1,12}$/.test(w)) return null;
   const window = parseInt(w, 36);
   if (!Number.isSafeInteger(window)) return null;

@@ -4,7 +4,7 @@ import { LIVE_WINDOW_S } from "./card-liveness";
 
 describe("secure card token", () => {
   it("round-trips", () => {
-    const t = { space: "alias" as const, handle: "lena", window: 58_000_123, code: "AB12CD" };
+    const t = { space: "alias" as const, handle: "le.na", window: 58_000_123, code: "AB12CD" };
     expect(decodeSecureToken(encodeSecureToken(t))).toEqual(t);
   });
   it("rejects tampered tokens", () => {
