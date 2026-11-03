@@ -74,7 +74,20 @@ function drawEmblem(ctx: CanvasRenderingContext2D, x: number, y: number, r: numb
   ctx.fill();
 }
 
-export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"> & { avatarPath?: string | null }, opts: { sdfText?: boolean; secureQr?: string | null; tier?: "adult" | "junior" } = {}): Promise<CardFaces> {
+/** ICAO OCR-B (free outline by Schwarz/Wagner, CTAN ocr-b-outline) for the MRZ. */
+let ocrb: Promise<boolean> | null = null;
+function loadOcrB(): Promise<boolean> {
+  if (ocrb) return ocrb;
+  ocrb = typeof FontFace === "undefined"
+    ? Promise.resolve(false)
+    : new FontFace("ROUT OCR-B", "url(/fonts/OCR-B.otf)").load().then((f) => {
+        document.fonts.add(f);
+        return true;
+      }).catch(() => false);
+  return ocrb;
+}
+
+export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"> & { avatarPath?: string | null; regionDisplay?: string }, opts: { sdfText?: boolean; secureQr?: string | null; tier?: "adult" | "junior"; baseHex?: string } = {}): Promise<CardFaces> {
   const make = () => {
     const c = document.createElement("canvas");
     c.width = FACE_W;
@@ -164,8 +177,9 @@ export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"
     fitText(f, `@${card.handle}`, FACE_W - 96, 30, 500);
     f.fillText(`@${card.handle}`, cx, FACE_H * 0.7 + 48);
     f.globalAlpha = 0.6;
-    fitText(f, card.subheader, FACE_W - 96, 22, 400);
-    f.fillText(card.subheader, cx, FACE_H * 0.7 + 92);
+    const sub = card.regionDisplay || card.subheader;
+    fitText(f, sub, FACE_W - 96, 22, 400);
+    f.fillText(sub, cx, FACE_H * 0.7 + 92);
   }
   f.textAlign = "center";
   f.globalAlpha = 0.45;
@@ -250,7 +264,7 @@ export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"
   drawQr(b, secure ?? card.qrValue, 88, qy, qrSize);
   b.textAlign = "center";
   b.fillStyle = "#e4e4e7";
-  const caption = secure ? "SECURE QR · VERLOOPT NA 30 S" : card.url.replace(/^https?:\/\//, "");
+  const caption = secure ? "SECURE QR · 60 S · EENMALIG" : card.url.replace(/^https?:\/\//, "");
   fitText(b, caption, FACE_W - 96, 26, 600);
   b.fillText(caption, FACE_W / 2, qy + qrSize + 56);
   // Live-code slot frame; the code itself is SDF text in the 3D card.
@@ -267,9 +281,9 @@ export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"
   b.fillStyle = "#e9e7e1";
   b.fillRect(0, mrzTop, FACE_W, 150);
   b.fillStyle = "#18181b";
-  b.font = `600 26px ui-monospace, SFMono-Regular, Menlo, monospace`;
+  b.font = (await loadOcrB()) ? `400 27px "ROUT OCR-B", monospace` : `600 26px ui-monospace, SFMono-Regular, Menlo, monospace`;
   b.textAlign = "left";
-  const lines = cardMrz({ sovereignId: card.sovereignId, handle: card.handle, space: card.space });
+  const lines = cardMrz({ sovereignId: card.sovereignId, handle: card.handle, space: card.space, holderHash: card.serial.replace(/[^A-Za-z0-9]/g, "").slice(-6) });
   const cw = (FACE_W - 64) / 30;
   lines.forEach((line, row) => {
     for (let c = 0; c < line.length; c++) b.fillText(line[c]!, 32 + c * cw, mrzTop + 42 + row * 38);
