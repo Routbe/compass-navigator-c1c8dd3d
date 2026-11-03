@@ -55,7 +55,38 @@ export const getCardLiveness = createServerFn({ method: "POST" })
       serverNow: now,
       seed: await liveSeed(key, card.serial, w),
       code: owner ? await liveCode(key, card.serial, w) : null,
+      secureUrl: owner ? await secureUrlFor(card.handle, card.space, w, await liveCode(key, card.serial, w)) : null,
     };
+  });
+
+async function secureUrlFor(handle: string, space: "root" | "alias", window: number, code: string): Promise<string> {
+  const { walletOrigin } = await import("./wallet-payload.server");
+  const { encodeSecureToken } = await import("./card-token");
+  return `${walletOrigin()}/verify/${encodeSecureToken({ handle: handle.replace(/^@/, ""), space, window, code })}`;
+}
+
+/** Public: check a secure QR from the back of a card. Expires with its window; rate limited. */
+export const verifySecureCardToken = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => z.object({ token: z.string().trim().min(10).max(200) }).parse(d))
+  .handler(async ({ data }) => {
+    const { decodeSecureToken, tokenFresh } = await import("./card-token");
+    const t = decodeSecureToken(data.token);
+    if (!t) return { status: "invalid" as const };
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const { hitRateLimit, clientIp } = await import("@/lib/rate-limit-db.server");
+    const limit = await hitRateLimit("card-secure-verify", clientIp(getRequest()), { limit: 20, windowSec: 300 }, { failClosed: true });
+    if (!limit.ok) return { status: "limited" as const };
+    if (!tokenFresh(t, Date.now())) return { status: "expired" as const };
+    const { generateWalletPayload } = await import("./wallet-payload.server");
+    const { livenessKey } = await import("./card-liveness.server");
+    const { liveCode } = await import("./card-liveness");
+    const card = await generateWalletPayload(t.handle, { space: t.space });
+    if (!card) return { status: "invalid" as const };
+    const expected = await liveCode(await livenessKey(), card.serial, t.window);
+    let d = expected.length ^ t.code.length;
+    for (let i = 0; i < expected.length; i++) d |= expected.charCodeAt(i) ^ (t.code.charCodeAt(i) || 0);
+    if (d !== 0) return { status: "invalid" as const };
+    return { status: "valid" as const, handle: card.handle, displayName: card.displayName, sovereignId: card.sovereignId, url: card.url };
   });
 
 /** Public: check a code a card holder shows you. Rate limited per visitor. */

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { downloadVCard } from "@/lib/vcard";
 import { getCardLiveness, getWalletCard, getWalletStatus, verifyCardLiveCode } from "@/lib/wallet/wallet.functions";
 import { pickCardView } from "@/lib/wallet/card-liveness";
+import { MIN_TEXT_CONTRAST, validateCardStyle } from "@/lib/wallet/card-style";
 import type { WalletStatus } from "@/lib/wallet/wallet-pass";
 import { drawCardFaces, hasWebGL, type CardFaces } from "./card-faces";
 import type { CardFinish, LiveRef, TiltRef, ZoomRef } from "./RoutCard3D";
@@ -73,6 +74,10 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
   const zoom: ZoomRef = useRef(0);
   const [zoomed, setZoomed] = useState(false);
   const [code, setCode] = useState<string | null>(null);
+  const [secureUrl, setSecureUrl] = useState<string | null>(null);
+  const [accent, setAccent] = useState<string | null>(null);
+  const accentCheck = card && accent ? validateCardStyle(accent, card.hexBackgroundColor) : null;
+  const styledCard = card && accent && accentCheck?.ok ? { ...card, hexForegroundColor: accent } : card;
   const [verifyInput, setVerifyInput] = useState("");
   const [verdict, setVerdict] = useState<"valid" | "invalid" | "limited" | null>(null);
   const loadLive = useServerFn(getCardLiveness);
@@ -87,11 +92,15 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
   }, [open, card, handle, space, loadCard, loadStatus]);
 
   useEffect(() => {
+    if (card) setFinish(defaultFinish(card.hexForegroundColor));
+  }, [card]);
+
+  useEffect(() => {
+    const card = styledCard;
     if (!card || webgl === null) return;
     let alive = true;
-    setFinish(defaultFinish(card.hexForegroundColor));
     // WebGL draws names as SDF text; the CSS fallback keeps them printed.
-    void Promise.all([drawCardFaces(card, { sdfText: webgl }), drawCardFaces(card)]).then(([gl, flat]) => {
+    void Promise.all([drawCardFaces(card, { sdfText: webgl, secureQr: secureUrl }), drawCardFaces(card, { secureQr: secureUrl })]).then(([gl, flat]) => {
       if (!alive) return;
       setFaces(gl);
       setImages({ front: flat.front.toDataURL("image/png"), back: flat.back.toDataURL("image/png") });
@@ -100,7 +109,8 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
     return () => {
       alive = false;
     };
-  }, [card, webgl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card, webgl, secureUrl, accentCheck?.ok ? accent : null]);
 
   // Live proof-of-now: new seed (and the owner's code) every server window.
   useEffect(() => {
@@ -114,6 +124,7 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
         const skew = Date.now() - r.serverNow;
         live.current = { seed: r.seed, expiresAt: r.expiresAt + skew, windowMs: 30_000 };
         setCode(r.code);
+        setSecureUrl(r.secureUrl ?? null);
         timer = setTimeout(() => void tick(), Math.max(1000, r.expiresAt + skew - Date.now() + 250));
       } catch {
         if (alive) timer = setTimeout(() => void tick(), 10_000);
@@ -264,7 +275,7 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
                   zoom={zoom}
                   onFlip={flip}
                   onReady={() => setReady(true)}
-                  text={{ displayName: card!.displayName, handle: card!.handle, subheader: card!.subheader, fg: card!.hexForegroundColor, sovereignId: card!.sovereignId, code }}
+                  text={{ displayName: card!.displayName, handle: card!.handle, subheader: card!.subheader, fg: styledCard!.hexForegroundColor, sovereignId: card!.sovereignId, code }}
                 />
               </Suspense>
             </GlBoundary>
@@ -297,6 +308,23 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
           )}
           {!gyro && <Button type="button" size="sm" variant="ghost" className="gap-1.5" onClick={() => void enableGyro()}><Smartphone className="h-3.5 w-3.5" aria-hidden /> {t("card.gyro")}</Button>}
         </div>
+
+        {card && code && (
+          <div className="grid gap-2 rounded-2xl border border-border p-3">
+            <label htmlFor="rout-accent" className="text-xs font-medium">{t("card.accent", { defaultValue: "Accentkleur van je kaart" })}</label>
+            <div className="flex items-center gap-2">
+              <input id="rout-accent" type="color" value={accent ?? card.hexForegroundColor} onChange={(e) => setAccent(e.target.value)} className="h-9 w-12 cursor-pointer rounded-md border border-border bg-transparent" />
+              {accent && <Button type="button" size="sm" variant="ghost" onClick={() => setAccent(null)}>{t("card.accentReset", { defaultValue: "Standaard" })}</Button>}
+            </div>
+            {accentCheck && (
+              <p role="status" className={cn("text-xs", accentCheck.ok ? "text-muted-foreground" : "text-destructive")}>
+                {accentCheck.ok
+                  ? t("card.accentOk", { defaultValue: "Goed leesbaar (contrast {{r}}:1).", r: accentCheck.ratio })
+                  : t("card.accentLow", { defaultValue: "Te weinig contrast ({{r}}:1, minimaal {{min}}:1). Deze kleur wordt niet gebruikt.", r: accentCheck.ratio, min: MIN_TEXT_CONTRAST })}
+              </p>
+            )}
+          </div>
+        )}
 
         {card && (
           <div className="rounded-2xl border border-border p-3">

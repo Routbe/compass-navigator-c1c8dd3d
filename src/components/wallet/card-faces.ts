@@ -74,7 +74,7 @@ function drawEmblem(ctx: CanvasRenderingContext2D, x: number, y: number, r: numb
   ctx.fill();
 }
 
-export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"> & { avatarPath?: string | null }, opts: { sdfText?: boolean } = {}): Promise<CardFaces> {
+export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"> & { avatarPath?: string | null }, opts: { sdfText?: boolean; secureQr?: string | null } = {}): Promise<CardFaces> {
   const make = () => {
     const c = document.createElement("canvas");
     c.width = FACE_W;
@@ -152,6 +152,12 @@ export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"
   f.font = `500 18px ui-sans-serif, system-ui, sans-serif`;
   f.fillText(card.url.replace(/^https?:\/\//, ""), cx, FACE_H - 56);
   f.globalAlpha = 1;
+  // Front: compact public identity QR (social / networking).
+  f.fillStyle = "#ffffff";
+  f.beginPath();
+  f.roundRect(36, FACE_H - 152, 112, 112, 14);
+  f.fill();
+  drawQr(f, card.qrValue, 40, FACE_H - 148, 104);
 
   // Emblem bottom-right of the portrait, printed faintly; the foil does the rest.
   const ex = FACE_W - 92;
@@ -218,11 +224,15 @@ export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"
   b.beginPath();
   b.roundRect(88 - 12, qy - 12, qrSize + 24, qrSize + 24, 24);
   b.fill();
-  drawQr(b, card.qrValue, 88, qy, qrSize);
+  // Back: secure, rotating QR for the owner (expires with the 30 s window);
+  // everyone else sees the public QR.
+  const secure = opts.secureQr ?? null;
+  drawQr(b, secure ?? card.qrValue, 88, qy, qrSize);
   b.textAlign = "center";
   b.fillStyle = "#e4e4e7";
-  fitText(b, card.url.replace(/^https?:\/\//, ""), FACE_W - 96, 26, 600);
-  b.fillText(card.url.replace(/^https?:\/\//, ""), FACE_W / 2, qy + qrSize + 56);
+  const caption = secure ? "SECURE QR · VERLOOPT NA 30 S" : card.url.replace(/^https?:\/\//, "");
+  fitText(b, caption, FACE_W - 96, 26, 600);
+  b.fillText(caption, FACE_W / 2, qy + qrSize + 56);
   // Live-code slot frame; the code itself is SDF text in the 3D card.
   b.strokeStyle = "rgba(255,255,255,0.18)";
   b.lineWidth = 2;
