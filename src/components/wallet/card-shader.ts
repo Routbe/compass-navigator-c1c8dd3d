@@ -39,6 +39,10 @@ uniform vec3 uLightPos;
 uniform vec2 uTexel;
 uniform float uLatentCos;
 uniform float uLatentWidth;
+uniform float uRough;     // < 0 = finish default, else PBR roughness
+uniform float uMetal;     // < 0 = finish default, else PBR metalness
+uniform float uClearcoat; // 0..1 lacquer lobe (ceramic)
+uniform float uAniso;     // 0..1 brushed highlight along the card's long axis
 varying vec2 vUv;
 varying vec3 vWorldPos;
 varying vec3 vN;
@@ -98,6 +102,7 @@ void main() {
   float isHolo = step(1.5, uFinish);
   float isMetal = 1.0 - isGlass - isHolo;
   float rough = mix(mix(0.38, 0.06, isGlass), 0.2, isHolo);
+  rough = mix(rough, clamp(uRough, 0.03, 1.0), step(0.0, uRough));
   float shininess = 2.0 / (rough * rough * rough * rough + 1e-3);
 
   // Foil: thin film whose thickness flows over the card, so colours sweep with tilt.
@@ -108,8 +113,15 @@ void main() {
   film = mix(film, film * vec3(1.05, 0.98, 1.1) + vec3(0.04, 0.02, 0.0), 0.5);
 
   float diff = clamp(dot(N, L), 0.0, 1.0);
-  float spec = pow(clamp(dot(N, H), 0.0, 1.0), shininess) * (shininess + 8.0) / 25.0;
+  float NdotH = clamp(dot(N, H), 0.0, 1.0);
+  float spec = pow(NdotH, shininess) * (shininess + 8.0) / 25.0;
+  // Brushed metal: stretch the highlight along the tangent (Ward-like, no branches).
+  float hT = dot(H, vT);
+  float hB = dot(H, vB);
+  float aniso = exp(-(hT * hT * 900.0 + hB * hB * 18.0) / max(NdotH, 0.05)) * (shininess + 8.0) / 40.0;
+  spec = mix(spec, aniso, clamp(uAniso, 0.0, 1.0));
   float F0 = mix(mix(0.6, 0.04, isGlass), 0.3, isHolo);
+  F0 = mix(F0, mix(0.04, 0.9, clamp(uMetal, 0.0, 1.0)), step(0.0, uMetal));
   float fres = F0 + (1.0 - F0) * pow(1.0 - cosV, 5.0);
 
   // Cheap studio environment for reflections.
@@ -121,6 +133,8 @@ void main() {
   col *= 1.0 - guilloche * 0.08 * (isMetal + isHolo);
   vec3 metalTint = mix(vec3(1.0), base.rgb + 0.35, 0.5 * isMetal);
   col += spec * metalTint * (1.0 - rough);
+  // Clearcoat lacquer: a tight white lobe on top, weighted by Fresnel.
+  col += pow(NdotH, 900.0) * 6.0 * uClearcoat * (0.04 + 0.96 * pow(1.0 - cosV, 5.0)) + pow(NdotH, 900.0) * 1.2 * uClearcoat;
   col += env * fres * mix(0.35, 0.6, isGlass);
   col = mix(col, film * (0.55 + env * 0.5 + spec * 0.8), foil * (0.55 + 0.4 * (1.0 - cosV)));
 
@@ -155,6 +169,10 @@ export function createSecurityMaterial(map: THREE.Texture, mask: THREE.Texture, 
       uTexel: { value: new THREE.Vector2(texel[0], texel[1]) },
       uLatentCos: { value: LATENT_COS },
       uLatentWidth: { value: LATENT_WIDTH },
+      uRough: { value: -1 },
+      uMetal: { value: -1 },
+      uClearcoat: { value: 0 },
+      uAniso: { value: 0 },
     },
   });
 }

@@ -70,6 +70,8 @@ function faceGeometry(shape: THREE.Shape): THREE.ShapeGeometry {
 type CardProps = {
   faces: CardFaces;
   finish: CardFinish;
+  /** PBR values from the CMF engine; overrides the finish defaults. */
+  pbr?: { roughness: number; metalness: number; clearcoat: number; anisotropy: number } | null;
   flipped: boolean;
   tilt: TiltRef;
   live: LiveRef;
@@ -94,7 +96,7 @@ function Embossed({ children, y, size, color, weight }: { children: string; y: n
   );
 }
 
-function Card({ faces, finish, flipped, tilt, live, zoom, onFlip, text }: CardProps) {
+function Card({ faces, finish, pbr, flipped, tilt, live, zoom, onFlip, text }: CardProps) {
   const group = useRef<THREE.Group>(null);
   const timer = useRef<THREE.Mesh>(null);
   const motion = useRef({ idle: 0, flip: 0, z: CAMERA_FAR, yaw: { x: 0, v: 0 } as Spring, pitch: { x: 0, v: 0 } as Spring });
@@ -119,8 +121,13 @@ function Card({ faces, finish, flipped, tilt, live, zoom, onFlip, text }: CardPr
   }, [faces]);
   const security = useMemo(() => createSecurityMaterial(textures.front, textures.mask, [1 / FACE_W, 1 / FACE_H]), [textures]);
   useEffect(() => {
-    security.uniforms["uFinish"]!.value = FINISH_INDEX[finish];
-  }, [security, finish]);
+    const u = security.uniforms;
+    u["uFinish"]!.value = FINISH_INDEX[finish];
+    u["uRough"]!.value = pbr ? pbr.roughness : -1;
+    u["uMetal"]!.value = pbr ? pbr.metalness : -1;
+    u["uClearcoat"]!.value = pbr ? pbr.clearcoat : 0;
+    u["uAniso"]!.value = pbr ? pbr.anisotropy : 0;
+  }, [security, finish, pbr]);
   useEffect(() => () => {
     textures.front.dispose();
     textures.back.dispose();
