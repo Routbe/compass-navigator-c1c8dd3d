@@ -12,7 +12,7 @@ import { CARD_RATIO, FACE_H, FACE_W, type CardFaces } from "./card-faces";
 import { stepSpring, type Spring } from "./card-physics";
 import { createSecurityMaterial } from "./card-shader";
 
-export type CardFinish = "metal" | "glass" | "holo";
+export type CardFinish = "metal" | "glass" | "holo" | "junior";
 export type TiltRef = { current: { x: number; y: number; at: number } };
 export type LiveRef = { current: { seed: [number, number, number, number]; expiresAt: number; windowMs: number } };
 export type ZoomRef = { current: number };
@@ -35,7 +35,7 @@ const ZOOM_DAMP = 5;
 const FONT = "/fonts/Inter-SemiBold.ttf";
 const MONO = "/fonts/og-jetbrains-mono.ttf";
 const MICRO = "ROUT · SOVEREIGN PROFILE · ZELFBESCHIKKING OVER JE IDENTITEIT · ".repeat(6);
-const FINISH_INDEX: Record<CardFinish, number> = { metal: 0, glass: 1, holo: 2 };
+const FINISH_INDEX: Record<CardFinish, number> = { metal: 0, glass: 1, holo: 2, junior: 2 };
 
 /** Canvas pixel → card-local coordinates. */
 const cx = (px: number) => (px / FACE_W - 0.5) * W;

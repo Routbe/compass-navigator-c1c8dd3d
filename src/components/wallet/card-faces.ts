@@ -74,7 +74,7 @@ function drawEmblem(ctx: CanvasRenderingContext2D, x: number, y: number, r: numb
   ctx.fill();
 }
 
-export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"> & { avatarPath?: string | null }, opts: { sdfText?: boolean; secureQr?: string | null } = {}): Promise<CardFaces> {
+export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"> & { avatarPath?: string | null }, opts: { sdfText?: boolean; secureQr?: string | null; tier?: "adult" | "junior" } = {}): Promise<CardFaces> {
   const make = () => {
     const c = document.createElement("canvas");
     c.width = FACE_W;
@@ -95,6 +95,26 @@ export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"
   g.addColorStop(1, shade(bg, -0.08));
   f.fillStyle = g;
   f.fillRect(0, 0, FACE_W, FACE_H);
+  if (opts.tier === "junior") {
+    // Junior tier: a livelier pattern of soft dots and waves over the brand colour.
+    const jg = f.createLinearGradient(0, 0, FACE_W, FACE_H);
+    jg.addColorStop(0, "rgba(56,189,248,0.35)");
+    jg.addColorStop(0.5, "rgba(250,204,21,0.25)");
+    jg.addColorStop(1, "rgba(52,211,153,0.35)");
+    f.fillStyle = jg;
+    f.fillRect(0, 0, FACE_W, FACE_H);
+    f.fillStyle = "rgba(255,255,255,0.14)";
+    for (let y = 24; y < FACE_H; y += 48) for (let x = (y / 48) % 2 ? 24 : 48; x < FACE_W; x += 48) {
+      f.beginPath();
+      f.arc(x, y + Math.sin(x / 40) * 6, 6, 0, Math.PI * 2);
+      f.fill();
+    }
+    f.fillStyle = fg;
+    f.globalAlpha = 0.8;
+    f.font = `700 16px ui-sans-serif, system-ui, sans-serif`;
+    f.fillText("JUNIOR", 50, 104);
+    f.globalAlpha = 1;
+  }
   f.fillStyle = fg;
   f.globalAlpha = 0.9;
   f.font = `700 34px ui-sans-serif, system-ui, sans-serif`;

@@ -76,6 +76,7 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
   const [code, setCode] = useState<string | null>(null);
   const [secureUrl, setSecureUrl] = useState<string | null>(null);
   const [ownerState, setOwnerState] = useState<{ owner: boolean; frozen: boolean; available: boolean }>({ owner: false, frozen: false, available: false });
+  const [junior, setJunior] = useState(false);
   const [liveNonce, setLiveNonce] = useState(0);
   const freezeCard = useServerFn(setMyCardFrozen);
   const [accent, setAccent] = useState<string | null>(null);
@@ -100,10 +101,11 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
 
   useEffect(() => {
     const card = styledCard;
+    const tier = finish === "junior" ? ("junior" as const) : ("adult" as const);
     if (!card || webgl === null) return;
     let alive = true;
     // WebGL draws names as SDF text; the CSS fallback keeps them printed.
-    void Promise.all([drawCardFaces(card, { sdfText: webgl, secureQr: secureUrl }), drawCardFaces(card, { secureQr: secureUrl })]).then(([gl, flat]) => {
+    void Promise.all([drawCardFaces(card, { sdfText: webgl, secureQr: secureUrl, tier }), drawCardFaces(card, { secureQr: secureUrl, tier })]).then(([gl, flat]) => {
       if (!alive) return;
       setFaces(gl);
       setImages({ front: flat.front.toDataURL("image/png"), back: flat.back.toDataURL("image/png") });
@@ -113,7 +115,11 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [card, webgl, secureUrl, accentCheck?.ok ? accent : null]);
+  }, [card, webgl, secureUrl, accentCheck?.ok ? accent : null, finish === "junior"]);
+
+  useEffect(() => {
+    if (junior) setFinish("junior");
+  }, [junior]);
 
   // Live proof-of-now: new seed (and the owner's code) every server window.
   useEffect(() => {
@@ -129,6 +135,7 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
         setCode(r.code);
         setSecureUrl(r.secureUrl ?? null);
         setOwnerState({ owner: r.owner, frozen: r.frozen, available: r.freezeAvailable });
+        setJunior(r.junior);
         timer = setTimeout(() => void tick(), Math.max(1000, r.expiresAt + skew - Date.now() + 250));
       } catch {
         if (alive) timer = setTimeout(() => void tick(), 10_000);
@@ -303,7 +310,7 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
           )}
           {faces && (
             <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
-              {(["metal", "glass", "holo"] as const).map((f) => (
+              {(junior ? (["junior", "metal", "glass", "holo"] as const) : (["metal", "glass", "holo"] as const)).map((f) => (
                 <button
                   key={f}
                   type="button"
@@ -311,7 +318,7 @@ export function RoutCardDialog({ open, onOpenChange, handle, space }: { open: bo
                   aria-pressed={finish === f}
                   className={cn("rounded-full border px-2.5 py-1 text-[11px] font-medium backdrop-blur", finish === f ? "border-foreground bg-foreground text-background" : "border-border bg-background/70")}
                 >
-                  {t(`card.finish.${f}`)}
+                  {t(`card.finish.${f}`, { defaultValue: f === "junior" ? "Junior" : f })}
                 </button>
               ))}
             </div>
