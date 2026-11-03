@@ -157,6 +157,7 @@ import { Route as InfoQrStudioRouteImport } from './routes/info.qr-studio'
 import { Route as InfoTipsRouteImport } from './routes/info.tips'
 import { Route as InfoUsernamesRouteImport } from './routes/info.usernames'
 import { Route as InfoWalletRouteImport } from './routes/info.wallet'
+import { Route as KaartTokenRouteImport } from './routes/kaart.$token'
 import { Route as OauthAuthorizeRouteImport } from './routes/oauth.authorize'
 import { Route as OauthEndSessionRouteImport } from './routes/oauth.end-session'
 import { Route as ProductIndexRouteImport } from './routes/product.index'
@@ -191,7 +192,6 @@ import { Route as SubscribeConfirmRouteImport } from './routes/subscribe.confirm
 import { Route as SubscribeLeaveRouteImport } from './routes/subscribe.leave'
 import { Route as SupportIndexRouteImport } from './routes/support.index'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
-import { Route as VerifyTokenRouteImport } from './routes/verify.$token'
 import { Route as WSlugRouteImport } from './routes/w.$slug'
 import { Route as WorkspaceTransferTokenRouteImport } from './routes/workspace-transfer.$token'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
@@ -1132,6 +1132,11 @@ const InfoWalletRoute = InfoWalletRouteImport.update({
   path: '/wallet',
   getParentRoute: () => InfoRoute,
 } as any)
+const KaartTokenRoute = KaartTokenRouteImport.update({
+  id: '/kaart/$token',
+  path: '/kaart/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OauthAuthorizeRoute = OauthAuthorizeRouteImport.update({
   id: '/oauth/authorize',
   path: '/oauth/authorize',
@@ -1303,11 +1308,6 @@ const UUsernameRoute = UUsernameRouteImport.update({
   id: '/u/$username',
   path: '/u/$username',
   getParentRoute: () => rootRouteImport,
-} as any)
-const VerifyTokenRoute = VerifyTokenRouteImport.update({
-  id: '/$token',
-  path: '/$token',
-  getParentRoute: () => VerifyRoute,
 } as any)
 const WSlugRoute = WSlugRouteImport.update({
   id: '/w/$slug',
@@ -2449,7 +2449,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/tour': typeof TourRoute
   '/vcard-qr': typeof VcardQrRoute
-  '/verify': typeof VerifyRouteWithChildren
+  '/verify': typeof VerifyRoute
   '/wifi-qr': typeof WifiQrRoute
   '/$username/$slug': typeof UsernameSlugRoute
   '/$username/ask': typeof UsernameAskRoute
@@ -2536,6 +2536,7 @@ export interface FileRoutesByFullPath {
   '/info/tips': typeof InfoTipsRoute
   '/info/usernames': typeof InfoUsernamesRoute
   '/info/wallet': typeof InfoWalletRoute
+  '/kaart/$token': typeof KaartTokenRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/oauth/end-session': typeof OauthEndSessionRoute
   '/product/batch-engine': typeof ProductBatchEngineRoute
@@ -2565,7 +2566,6 @@ export interface FileRoutesByFullPath {
   '/subscribe/confirm': typeof SubscribeConfirmRoute
   '/subscribe/leave': typeof SubscribeLeaveRoute
   '/u/$username': typeof UUsernameRoute
-  '/verify/$token': typeof VerifyTokenRoute
   '/w/$slug': typeof WSlugRoute
   '/workspace-transfer/$token': typeof WorkspaceTransferTokenRoute
   '/about/': typeof AboutIndexRoute
@@ -2817,7 +2817,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/tour': typeof TourRoute
   '/vcard-qr': typeof VcardQrRoute
-  '/verify': typeof VerifyRouteWithChildren
+  '/verify': typeof VerifyRoute
   '/wifi-qr': typeof WifiQrRoute
   '/$username/$slug': typeof UsernameSlugRoute
   '/$username/ask': typeof UsernameAskRoute
@@ -2902,6 +2902,7 @@ export interface FileRoutesByTo {
   '/info/tips': typeof InfoTipsRoute
   '/info/usernames': typeof InfoUsernamesRoute
   '/info/wallet': typeof InfoWalletRoute
+  '/kaart/$token': typeof KaartTokenRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/oauth/end-session': typeof OauthEndSessionRoute
   '/product/batch-engine': typeof ProductBatchEngineRoute
@@ -2930,7 +2931,6 @@ export interface FileRoutesByTo {
   '/subscribe/confirm': typeof SubscribeConfirmRoute
   '/subscribe/leave': typeof SubscribeLeaveRoute
   '/u/$username': typeof UUsernameRoute
-  '/verify/$token': typeof VerifyTokenRoute
   '/w/$slug': typeof WSlugRoute
   '/workspace-transfer/$token': typeof WorkspaceTransferTokenRoute
   '/about': typeof AboutIndexRoute
@@ -3194,7 +3194,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/tour': typeof TourRoute
   '/vcard-qr': typeof VcardQrRoute
-  '/verify': typeof VerifyRouteWithChildren
+  '/verify': typeof VerifyRoute
   '/wifi-qr': typeof WifiQrRoute
   '/$username_/$slug': typeof UsernameSlugRoute
   '/$username_/ask': typeof UsernameAskRoute
@@ -3281,6 +3281,7 @@ export interface FileRoutesById {
   '/info/tips': typeof InfoTipsRoute
   '/info/usernames': typeof InfoUsernamesRoute
   '/info/wallet': typeof InfoWalletRoute
+  '/kaart/$token': typeof KaartTokenRoute
   '/oauth/authorize': typeof OauthAuthorizeRoute
   '/oauth/end-session': typeof OauthEndSessionRoute
   '/product/batch-engine': typeof ProductBatchEngineRoute
@@ -3310,7 +3311,6 @@ export interface FileRoutesById {
   '/subscribe/confirm': typeof SubscribeConfirmRoute
   '/subscribe/leave': typeof SubscribeLeaveRoute
   '/u/$username': typeof UUsernameRoute
-  '/verify/$token': typeof VerifyTokenRoute
   '/w/$slug': typeof WSlugRoute
   '/workspace-transfer/$token': typeof WorkspaceTransferTokenRoute
   '/about/': typeof AboutIndexRoute
@@ -3663,6 +3663,7 @@ export interface FileRouteTypes {
     | '/info/tips'
     | '/info/usernames'
     | '/info/wallet'
+    | '/kaart/$token'
     | '/oauth/authorize'
     | '/oauth/end-session'
     | '/product/batch-engine'
@@ -3692,7 +3693,6 @@ export interface FileRouteTypes {
     | '/subscribe/confirm'
     | '/subscribe/leave'
     | '/u/$username'
-    | '/verify/$token'
     | '/w/$slug'
     | '/workspace-transfer/$token'
     | '/about/'
@@ -4029,6 +4029,7 @@ export interface FileRouteTypes {
     | '/info/tips'
     | '/info/usernames'
     | '/info/wallet'
+    | '/kaart/$token'
     | '/oauth/authorize'
     | '/oauth/end-session'
     | '/product/batch-engine'
@@ -4057,7 +4058,6 @@ export interface FileRouteTypes {
     | '/subscribe/confirm'
     | '/subscribe/leave'
     | '/u/$username'
-    | '/verify/$token'
     | '/w/$slug'
     | '/workspace-transfer/$token'
     | '/about'
@@ -4407,6 +4407,7 @@ export interface FileRouteTypes {
     | '/info/tips'
     | '/info/usernames'
     | '/info/wallet'
+    | '/kaart/$token'
     | '/oauth/authorize'
     | '/oauth/end-session'
     | '/product/batch-engine'
@@ -4436,7 +4437,6 @@ export interface FileRouteTypes {
     | '/subscribe/confirm'
     | '/subscribe/leave'
     | '/u/$username'
-    | '/verify/$token'
     | '/w/$slug'
     | '/workspace-transfer/$token'
     | '/about/'
@@ -4702,7 +4702,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TourRoute: typeof TourRoute
   VcardQrRoute: typeof VcardQrRoute
-  VerifyRoute: typeof VerifyRouteWithChildren
+  VerifyRoute: typeof VerifyRoute
   WifiQrRoute: typeof WifiQrRoute
   UsernameSlugRoute: typeof UsernameSlugRoute
   UsernameAskRoute: typeof UsernameAskRoute
@@ -4735,6 +4735,7 @@ export interface RootRouteChildren {
   FeedbackSlugRoute: typeof FeedbackSlugRoute
   GiftCodeRoute: typeof GiftCodeRoute
   IdentityRevokeRoute: typeof IdentityRevokeRoute
+  KaartTokenRoute: typeof KaartTokenRoute
   OauthAuthorizeRoute: typeof OauthAuthorizeRoute
   OauthEndSessionRoute: typeof OauthEndSessionRoute
   QrPaymentRoute: typeof QrPaymentRouteWithChildren
@@ -5890,6 +5891,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InfoWalletRouteImport
       parentRoute: typeof InfoRoute
     }
+    '/kaart/$token': {
+      id: '/kaart/$token'
+      path: '/kaart/$token'
+      fullPath: '/kaart/$token'
+      preLoaderRoute: typeof KaartTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/oauth/authorize': {
       id: '/oauth/authorize'
       path: '/oauth/authorize'
@@ -6127,13 +6135,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/u/$username'
       preLoaderRoute: typeof UUsernameRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/verify/$token': {
-      id: '/verify/$token'
-      path: '/$token'
-      fullPath: '/verify/$token'
-      preLoaderRoute: typeof VerifyTokenRouteImport
-      parentRoute: typeof VerifyRoute
     }
     '/w/$slug': {
       id: '/w/$slug'
@@ -8053,17 +8054,6 @@ const SupportRouteChildren: SupportRouteChildren = {
 const SupportRouteWithChildren =
   SupportRoute._addFileChildren(SupportRouteChildren)
 
-interface VerifyRouteChildren {
-  VerifyTokenRoute: typeof VerifyTokenRoute
-}
-
-const VerifyRouteChildren: VerifyRouteChildren = {
-  VerifyTokenRoute: VerifyTokenRoute,
-}
-
-const VerifyRouteWithChildren =
-  VerifyRoute._addFileChildren(VerifyRouteChildren)
-
 interface QrPaymentRouteChildren {
   QrPaymentCryptoRoute: typeof QrPaymentCryptoRoute
   QrPaymentPaypalRoute: typeof QrPaymentPaypalRoute
@@ -8151,7 +8141,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TourRoute: TourRoute,
   VcardQrRoute: VcardQrRoute,
-  VerifyRoute: VerifyRouteWithChildren,
+  VerifyRoute: VerifyRoute,
   WifiQrRoute: WifiQrRoute,
   UsernameSlugRoute: UsernameSlugRoute,
   UsernameAskRoute: UsernameAskRoute,
@@ -8184,6 +8174,7 @@ const rootRouteChildren: RootRouteChildren = {
   FeedbackSlugRoute: FeedbackSlugRoute,
   GiftCodeRoute: GiftCodeRoute,
   IdentityRevokeRoute: IdentityRevokeRoute,
+  KaartTokenRoute: KaartTokenRoute,
   OauthAuthorizeRoute: OauthAuthorizeRoute,
   OauthEndSessionRoute: OauthEndSessionRoute,
   QrPaymentRoute: QrPaymentRouteWithChildren,
