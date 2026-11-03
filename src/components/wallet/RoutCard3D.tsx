@@ -67,6 +67,24 @@ function faceGeometry(shape: THREE.Shape): THREE.ShapeGeometry {
   return g;
 }
 
+/** Secure QR lifetime (ms epoch); exp 0 = no secure QR on the back. */
+export type SecureRef = MutableRefObject<{ iat: number; exp: number }>;
+
+const ringVertex = /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+// Shrinking time ring around the secure QR; branch-free, colour runs green -> amber -> red.
+const ringFragment = /* glsl */ `
+uniform float uFrac;
+varying vec2 vUv;
+void main() {
+  vec2 p = vUv * 2.0 - 1.0;
+  float r = max(abs(p.x), abs(p.y));
+  float band = smoothstep(0.955, 0.965, r) * (1.0 - smoothstep(0.99, 1.0, r));
+  float a = fract(atan(p.x, p.y) / 6.2831853 + 1.0);
+  float on = step(a, uFrac) * step(0.0001, uFrac);
+  vec3 c = mix(vec3(0.94, 0.27, 0.27), mix(vec3(0.98, 0.75, 0.14), vec3(0.2, 0.83, 0.6), smoothstep(0.35, 0.7, uFrac)), smoothstep(0.1, 0.35, uFrac));
+  gl_FragColor = vec4(c, band * on);
+}`;
+
 type CardProps = {
   faces: CardFaces;
   finish: CardFinish;
@@ -76,6 +94,7 @@ type CardProps = {
   tilt: TiltRef;
   live: LiveRef;
   zoom: ZoomRef;
+  secure?: SecureRef;
   onFlip: () => void;
   text: { displayName: string; handle: string; subheader: string; fg: string; sovereignId: string; code: string | null };
 };
@@ -96,7 +115,12 @@ function Embossed({ children, y, size, color, weight }: { children: string; y: n
   );
 }
 
-function Card({ faces, finish, pbr, flipped, tilt, live, zoom, onFlip, text }: CardProps) {
+function Card({ faces, finish, pbr, flipped, tilt, live, zoom, secure, onFlip, text }: CardProps) {
+  const ring = useMemo(
+    () => new THREE.ShaderMaterial({ vertexShader: ringVertex, fragmentShader: ringFragment, transparent: true, depthWrite: false, toneMapped: false, uniforms: { uFrac: { value: 0 } } }),
+    [],
+  );
+  useEffect(() => () => ring.dispose(), [ring]);
   const group = useRef<THREE.Group>(null);
   const timer = useRef<THREE.Mesh>(null);
   const motion = useRef({ idle: 0, flip: 0, z: CAMERA_FAR, yaw: { x: 0, v: 0 } as Spring, pitch: { x: 0, v: 0 } as Spring });
@@ -168,6 +192,10 @@ function Card({ faces, finish, pbr, flipped, tilt, live, zoom, onFlip, text }: C
     const s = live.current.seed;
     (u["uSeed"]!.value as THREE.Vector4).set(s[0], s[1], s[2], s[3]);
     (u["uLightPos"]!.value as THREE.Vector3).set(t.x * 2.2 + Math.sin(state.clock.elapsedTime * 0.3) * 0.4, t.y * 2 + 0.8, 2.4);
+    if (secure) {
+      const { iat, exp } = secure.current;
+      ring.uniforms["uFrac"]!.value = exp > 0 ? Math.max(0, Math.min(1, (exp - Date.now()) / Math.max(1, exp - iat))) : 0;
+    }
     if (timer.current) {
       const left = Math.max(0, Math.min(1, (live.current.expiresAt - Date.now()) / live.current.windowMs));
       timer.current.scale.x = Math.max(left, 0.0001);
@@ -205,6 +233,9 @@ function Card({ faces, finish, pbr, flipped, tilt, live, zoom, onFlip, text }: C
         <Text font={MONO} fontSize={0.06} letterSpacing={0.18} position={[0, cy(slotY), 0]} anchorX="center" anchorY="middle" color="#f4f4f5">
           {text.code ? `${text.code.slice(0, 3)} ${text.code.slice(3)}` : "··· ···"}
         </Text>
+        <mesh position={[0, cy(qy + qrSize / 2), 0.0003]} material={ring}>
+          <planeGeometry args={[(qrSize + 44) / FACE_W, ((qrSize + 44) / FACE_H) * H]} />
+        </mesh>
         <mesh ref={timer} position={[0, cy(slotY + 22), 0.0002]}>
           <planeGeometry args={[cx(FACE_W - 64) - cx(64), 0.004]} />
           <meshBasicMaterial color="#34d399" toneMapped={false} />

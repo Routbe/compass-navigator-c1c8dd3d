@@ -44,8 +44,8 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, max: number, size:
 }
 
 /** Crisp QR modules with a 4-module quiet zone; error correction M. */
-export function drawQr(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, size: number) {
-  const qr = qrcode(0, "M");
+export function drawQr(ctx: CanvasRenderingContext2D, value: string, x: number, y: number, size: number, ecc: "M" | "H" = "M") {
+  const qr = qrcode(0, ecc);
   qr.addData(value);
   qr.make();
   const n = qr.getModuleCount();
@@ -191,7 +191,14 @@ export async function drawCardFaces(card: Omit<WalletCardPayload, "heroImageUrl"
   f.beginPath();
   f.roundRect(36, FACE_H - 152, 112, 112, 14);
   f.fill();
-  drawQr(f, card.qrValue, 40, FACE_H - 148, 104);
+  // Error correction H (30 %), so the centred ROUT seal never breaks scanning.
+  drawQr(f, card.qrValue, 40, FACE_H - 148, 104, "H");
+  f.fillStyle = "#ffffff";
+  f.beginPath();
+  f.arc(92, FACE_H - 96, 13, 0, Math.PI * 2);
+  f.fill();
+  f.fillStyle = "#111111";
+  drawEmblem(f, 92, FACE_H - 96, 9);
 
   // Emblem bottom-right of the portrait, printed faintly; the foil does the rest.
   const ex = FACE_W - 92;
