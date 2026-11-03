@@ -1,0 +1,100 @@
+[
+  {
+    "capability": "code",
+    "source": "ROUT repository",
+    "outcome": "preserve",
+    "status": "verified",
+    "next_action": "Source imported; public pages and 19 tests checked."
+  },
+  {
+    "capability": "schema",
+    "source": "Original Neon",
+    "outcome": "preserve",
+    "status": "pending",
+    "next_action": "Verify source runtime guard and schema through linked connection; do not run migrations."
+  },
+  {
+    "capability": "records",
+    "source": "Original Neon",
+    "outcome": "preserve",
+    "status": "pending",
+    "next_action": "Verify existing application records without moving or overwriting them."
+  },
+  {
+    "capability": "auth identities",
+    "source": "ROUT cookie accounts",
+    "outcome": "preserve",
+    "status": "pending",
+    "next_action": "Supply original stable signing secrets securely and verify sign-in."
+  },
+  {
+    "capability": "authorization",
+    "source": "ROUT guarded rout_app access",
+    "outcome": "preserve",
+    "status": "pending",
+    "next_action": "Verify exact runtime guard; never weaken it."
+  },
+  {
+    "capability": "uploaded file bytes",
+    "source": "Scaleway",
+    "outcome": "preserve",
+    "status": "blocked",
+    "next_action": "Connect original object storage and buckets securely."
+  },
+  {
+    "capability": "external providers",
+    "source": "Stripe, Infomaniak, OAuth, Wallet",
+    "outcome": "preserve",
+    "status": "blocked",
+    "next_action": "Supply retained provider credentials and verify actual flows."
+  },
+  {
+    "capability": "public endpoints",
+    "source": "Imported TanStack routes",
+    "outcome": "preserve",
+    "status": "pending",
+    "next_action": "Verify provider-specific requests after configuration."
+  },
+  {
+    "capability": "callbacks",
+    "source": "Original OAuth providers",
+    "outcome": "preserve",
+    "status": "blocked",
+    "next_action": "Register this app origin in original provider applications."
+  },
+  {
+    "capability": "webhooks",
+    "source": "Stripe",
+    "outcome": "preserve",
+    "status": "blocked",
+    "next_action": "Configure original Stripe endpoint and signing secret."
+  },
+  {
+    "capability": "schedules",
+    "source": "Imported cron source",
+    "outcome": "preserve",
+    "status": "blocked",
+    "next_action": "Confirm existing schedules and cutover before creating new jobs."
+  },
+  {
+    "capability": "secrets",
+    "source": "Original secure deployment configuration",
+    "outcome": "preserve",
+    "status": "blocked",
+    "next_action": "Collect through secure forms, never copy source .env."
+  },
+  {
+    "capability": "cutover",
+    "source": "Domains and standalone worker",
+    "outcome": "preserve",
+    "status": "blocked",
+    "next_action": "Separate worker deployment and provider URL changes required."
+  },
+  {
+    "capability": "verification",
+    "source": "App preview",
+    "outcome": "preserve",
+    "status": "partial",
+    "next_action": "Public UI checked; live provider flows need credentials."
+  }
+]
